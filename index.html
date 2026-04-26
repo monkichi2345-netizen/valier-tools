@@ -506,10 +506,10 @@ ACCESSORY_PLACEHOLDER
       }
       return m.content;
     }).join('\n');
-    const res = await fetch(`${GAS_URL}?action=generate`, {
+    const res = await fetch(GAS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: prompt
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'generate', prompt })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
