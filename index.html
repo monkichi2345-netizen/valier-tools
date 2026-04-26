@@ -164,7 +164,45 @@
 
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhyXS1KzmO9syc61ZvjSOB6d3w2mxQmqfg9OTv62TBlIUx_/exec';
-const ANTHROPIC_KEY = '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';
+
+async function downloadAllImages(folderUrl) {
+  // フォルダIDを取得
+  const match = folderUrl.match(/folders\/([a-zA-Z0-9_-]+)/);
+  if (!match) { alert('フォルダURLが不正です'); return; }
+  const folderId = match[1];
+
+  // Google Drive APIでファイル一覧取得（OAuth済みトークン使用）
+  try {
+    const token = await getAccessToken();
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const data = await res.json();
+    const files = (data.files || []).filter(f => f.mimeType.startsWith('image/'));
+    if (files.length === 0) { alert('画像が見つかりませんでした'); return; }
+
+    // 1枚ずつダウンロード
+    for (const file of files) {
+      const imgRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const blob = await imgRes.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(url);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    alert(`${files.length}枚のダウンロードが完了しました！`);
+  } catch(err) {
+    alert('ダウンロードエラー：' + err.message);
+  }
+}
+
 let selectedRank = '';
 let productName = '';
 let productPrice = null;
@@ -238,10 +276,17 @@ async function fetchProduct() {
       // 画像フォルダボタン表示
       if (data.folderUrl) {
         document.getElementById('folder-btn-area').innerHTML = `
-          <a href="${data.folderUrl}" target="_blank"
-             style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:8px 14px;background:#f5f4f1;border:1px solid #e0ddd8;border-radius:6px;font-size:13px;color:#1a1a1a;text-decoration:none;">
-            📁 画像フォルダを開く
-          </a>`;
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <a href="${data.folderUrl}" target="_blank"
+               style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#f5f4f1;border:1px solid #e0ddd8;border-radius:6px;font-size:13px;color:#1a1a1a;text-decoration:none;">
+              📁 画像フォルダを開く
+            </a>
+            <button onclick="downloadAllImages('${data.folderUrl}')"
+               style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#f5f4f1;border:1px solid #e0ddd8;border-radius:6px;font-size:13px;color:#1a1a1a;cursor:pointer;">
+              ⬇️ 画像を一括ダウンロード
+            </button>
+          </div>`;
+        window._currentFolderUrl = data.folderUrl;
       } else {
         document.getElementById('folder-btn-area').innerHTML = '';
       }
@@ -435,19 +480,16 @@ ACCESSORY_PLACEHOLDER
 ・コードブロック外に文字一切書かない`;
 
   const callAPI = async (messages) => {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 1500, messages })
-    });
+    const prompt = messages.map(m => {
+      if (Array.isArray(m.content)) {
+        return m.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+      }
+      return m.content;
+    }).join('\n');
+    const res = await fetch(`${GAS_URL}?action=generate&prompt=${encodeURIComponent(prompt)}`);
     const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    return data.content.map(i => i.text || '').join('');
+    if (data.error) throw new Error(data.error);
+    return data.result;
   };
 
   const parseBlocks = (text) => {
