@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VALIER 撮影提出ツール</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#f9f8f6;--surface:#ffffff;--border:#e0ddd8;--border-hover:#bbb8b2;
+    --text:#1a1a1a;--text-muted:#777;--text-hint:#aaa;
+    --accent:#1a1a1a;--accent-fg:#fff;
+    --success:#1a7f4b;--success-bg:#edfaf3;
+    --danger:#c0392b;--danger-bg:#fdf0ee;
+    --radius:10px;--radius-sm:6px;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:14px;line-height:1.7;min-height:100vh;padding:24px 16px 60px}
+  .container{max-width:680px;margin:0 auto}
+  header{margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+  header h1{font-size:18px;font-weight:500;letter-spacing:0.08em}
+  header p{font-size:12px;color:var(--text-muted);margin-top:4px}
+  .step{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+  .step-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .step-num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-fg);font-size:11px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .step-title{font-size:14px;font-weight:500}
+  .field{margin-bottom:14px}.field:last-child{margin-bottom:0}
+  label{font-size:11px;color:var(--text-muted);display:block;margin-bottom:5px}
+  input[type=text],textarea,select{width:100%;font-family:'Noto Sans JP',sans-serif;font-size:14px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;color:var(--text);outline:none;transition:border-color .15s}
+  input[type=text]:focus,textarea:focus,select:focus{border-color:var(--border-hover)}
+  textarea{resize:vertical;line-height:1.7}
+  .search-row{display:flex;gap:8px}
+  .search-row input{flex:1}
+  .search-btn{padding:9px 18px;background:var(--accent);color:var(--accent-fg);border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;font-family:'Noto Sans JP',sans-serif;transition:opacity .15s}
+  .search-btn:hover{opacity:.85}.search-btn:disabled{opacity:.4;cursor:not-allowed}
+  .product-card{background:#f5f4f1;border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;min-height:38px;display:flex;align-items:center;word-break:break-all}
+  .product-card.empty{color:var(--text-hint)}
+  .voice-row{display:flex;gap:8px;align-items:flex-start}
+  .voice-row textarea,.voice-row input{flex:1}
+  .voice-btn{flex-shrink:0;width:38px;height:38px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s;padding:0}
+  .voice-btn:hover{background:#f5f4f1}
+  .voice-btn.recording{background:var(--danger);border-color:var(--danger);animation:blink 1s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
+  .upload-area{border:1px dashed var(--border);border-radius:var(--radius-sm);padding:22px;text-align:center;cursor:pointer;color:var(--text-muted);font-size:13px;transition:background .15s}
+  .upload-area:hover{background:#f5f4f1}
+  .img-preview{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .img-thumb-wrap{position:relative;width:72px;height:72px}
+  .img-thumb{width:72px;height:72px;object-fit:cover;border-radius:var(--radius-sm);border:1px solid var(--border)}
+  .img-remove{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;line-height:1}
+  .img-count{font-size:12px;color:var(--text-muted);margin-top:6px}
+  .submit-btn{width:100%;padding:15px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-top:6px;transition:opacity .15s;letter-spacing:0.05em}
+  .submit-btn:hover{opacity:.88}.submit-btn:disabled{opacity:.35;cursor:not-allowed}
+  .status{font-size:12px;padding:5px 0;margin-top:6px}
+  .status.ok{color:var(--success)}.status.err{color:var(--danger)}
+  .loading{display:flex;align-items:center;gap:8px;padding:16px 0;color:var(--text-muted);font-size:13px}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);display:inline-block;animation:pulse 1.2s infinite}
+  .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+  @keyframes pulse{0%,80%,100%{opacity:.2}40%{opacity:1}}
+  .rank-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .rank-btn{padding:9px 4px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text);text-align:center;transition:all .1s;line-height:1.4}
+  .rank-btn:hover{border-color:var(--border-hover);background:#f5f4f1}
+  .rank-btn.sel{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .rank-desc{font-size:10px;color:var(--text-muted);margin-top:2px}
+  .rank-btn.sel .rank-desc{color:rgba(255,255,255,.7)}
+  .accessory-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .acc-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px}
+  .acc-item input{width:16px;height:16px;cursor:pointer;flex-shrink:0}
+  .progress-wrap{margin-top:12px}
+  .progress-bar-bg{background:#e0ddd8;border-radius:20px;height:6px;overflow:hidden}
+  .progress-bar{background:var(--accent);height:6px;border-radius:20px;transition:width .3s;width:0%}
+  .progress-text{font-size:11px;color:var(--text-muted);margin-top:4px;text-align:center}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>VALIER 撮影提出ツール</h1>
+    <p>管理番号を入力して採寸・状態・画像を提出してください</p>
+  </header>
+
+  <!-- STEP 1：管理番号 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">1</div><span class="step-title">管理番号で商品を確認</span></div>
+    <div class="field">
+      <label>管理番号</label>
+      <div class="search-row">
+        <input type="text" id="mgmt-num" placeholder="例：115162（6桁）" onkeydown="if(event.key==='Enter')fetchProduct()"/>
+        <button class="voice-btn" onclick="startVoice('mgmt-num',this)" title="音声入力">🎤</button>
+        <button class="search-btn" id="search-btn" onclick="fetchProduct()">検索</button>
+      </div>
+      <div id="search-status"></div>
+    </div>
+    <div class="field">
+      <label>商品名</label>
+      <div class="product-card empty" id="product-name">管理番号を検索すると表示されます</div>
+    </div>
+  </div>
+
+  <!-- STEP 2：採寸・状態 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">2</div><span class="step-title">採寸・状態メモ・ランク</span></div>
+    <div class="field">
+      <label>採寸データ</label>
+      <div class="voice-row">
+        <textarea id="size-data" rows="2" placeholder="例：横〇cm 縦〇cm 幅〇cm ハンドル高さ〇cm ショルダー全長〇cm"></textarea>
+        <button class="voice-btn" onclick="startVoice('size-data',this)" title="音声入力">🎤</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>状態メモ（気になる箇所を記入）</label>
+      <div class="voice-row">
+        <textarea id="cond-note" rows="3" placeholder="例：表面にスレあり、内側に薄い変色、金具に小傷"></textarea>
+        <button class="voice-btn" onclick="startVoice('cond-note',this)" title="音声入力">🎤</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>商品状態ランク</label>
+      <div class="rank-grid">
+        <button class="rank-btn" onclick="selRank(this,'S')"><div>S</div><div class="rank-desc">未使用保管品</div></button>
+        <button class="rank-btn" onclick="selRank(this,'SA')"><div>SA</div><div class="rank-desc">未使用級</div></button>
+        <button class="rank-btn" onclick="selRank(this,'A')"><div>A</div><div class="rank-desc">極美品</div></button>
+        <button class="rank-btn" onclick="selRank(this,'AB+')"><div>AB+</div><div class="rank-desc">AB上位</div></button>
+        <button class="rank-btn" onclick="selRank(this,'AB')"><div>AB</div><div class="rank-desc">美品</div></button>
+        <button class="rank-btn" onclick="selRank(this,'AB-')"><div>AB-</div><div class="rank-desc">AB下位</div></button>
+        <button class="rank-btn" onclick="selRank(this,'B+')"><div>B+</div><div class="rank-desc">B上位</div></button>
+        <button class="rank-btn" onclick="selRank(this,'B')"><div>B</div><div class="rank-desc">難あり</div></button>
+        <button class="rank-btn" onclick="selRank(this,'B-')"><div>B-</div><div class="rank-desc">B下位</div></button>
+        <button class="rank-btn" onclick="selRank(this,'BC')"><div>BC</div><div class="rank-desc">ジャンク</div></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3：付属品 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">3</div><span class="step-title">付属品</span></div>
+    <div class="field">
+      <div class="accessory-grid">
+        <label class="acc-item"><input type="checkbox" data-output="ギャランティカード類"> ギャランティカード</label>
+        <label class="acc-item"><input type="checkbox" data-output="ケアカード類"> ケアカード</label>
+        <label class="acc-item"><input type="checkbox" data-output="カード類"> その他カード類</label>
+        <label class="acc-item"><input type="checkbox" data-output="保存袋"> 保存袋</label>
+        <label class="acc-item"><input type="checkbox" data-output="箱"> 箱</label>
+        <label class="acc-item"><input type="checkbox" data-output="ショルダーストラップ"> ショルダーストラップ</label>
+        <label class="acc-item"><input type="checkbox" data-output="社外ショルダーストラップ"> 社外ショルダーストラップ</label>
+      </div>
+      <div class="voice-row" style="margin-top:8px">
+        <input type="text" id="accessory-other" placeholder="その他（例：ベルト、鍵など）"/>
+        <button class="voice-btn" onclick="startVoice('accessory-other',this)" title="音声入力">🎤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4：画像 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">4</div><span class="step-title">商品画像（5〜20枚）</span></div>
+    <div class="field">
+      <div class="upload-area" onclick="document.getElementById('img-input').click()">
+        タップして画像を追加（複数選択可）
+      </div>
+      <input type="file" id="img-input" accept="image/*" multiple style="display:none" onchange="handleImages(this)"/>
+      <div class="img-count" id="img-count"></div>
+      <div class="img-preview" id="img-preview"></div>
+    </div>
+  </div>
+
+  <!-- STEP 5：作業者 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">5</div><span class="step-title">作業者</span></div>
+    <div class="field">
+      <label>作業者コード</label>
+      <select id="worker-select">
+        <option value="">選択してください</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="submit-btn" id="submit-btn" onclick="submitAll()">提出する</button>
+  <div id="submit-status"></div>
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhyXS1KzmO9syc61ZvjSOB6d3w2mxQmqfg9OTv62TBlIUx_/exec';
+const DRIVE_FOLDER_ID = '1tgNP9KsmIxOMTU_G7XQQGWbm_3WUF-BA';
+const CLIENT_ID = '24568286649-p64c441e8mrgutb8p81e7it3jg2u8v7e.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+let accessToken = null;
+let productName = '';
+let imageDataList = [];
+let recognition = null;
+let activeVoiceBtn = null;
+
+// Google認証
+async function getAccessToken() {
+  return new Promise((resolve, reject) => {
+    if (accessToken) { resolve(accessToken); return; }
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (response) => {
+        if (response.error) { reject(response.error); return; }
+        accessToken = response.access_token;
+        resolve(accessToken);
+      }
+    });
+    client.requestAccessToken();
+  });
+}
+
+// Google Drive に画像アップロード
+async function uploadToDrive(base64, fileName, folderId, token) {
+  // 管理番号フォルダを作成or取得
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  
+  // フォルダ検索
+  const searchRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=name='${mgmtNum}' and '${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const searchData = await searchRes.json();
+  
+  let subFolderId;
+  if (searchData.files && searchData.files.length > 0) {
+    subFolderId = searchData.files[0].id;
+  } else {
+    // フォルダ作成
+    const folderRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: mgmtNum, mimeType: 'application/vnd.google-apps.folder', parents: [folderId] })
+    });
+    const folderData = await folderRes.json();
+    subFolderId = folderData.id;
+  }
+
+  // 画像アップロード
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'image/jpeg' });
+
+  const metadata = { name: fileName, parents: [subFolderId] };
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', blob);
+
+  await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form
+  });
+}
+
+let selectedRank = '';
+
+function selRank(btn, rank) {
+  selectedRank = rank;
+  document.querySelectorAll('.rank-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+// 作業者リスト取得
+async function loadWorkers() {
+  try {
+    const res = await fetch(`${GAS_URL}?type=workers`);
+    const data = await res.json();
+    const sel = document.getElementById('worker-select');
+    if (data.workers) {
+      data.workers.forEach(w => {
+        const opt = document.createElement('option');
+        opt.value = w[0];
+        opt.textContent = `${w[0]} - ${w[1]}`;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e) {}
+}
+loadWorkers();
+
+// 商品名取得
+async function fetchProduct() {
+  const num = document.getElementById('mgmt-num').value.trim();
+  if (!num) return;
+  const btn = document.getElementById('search-btn');
+  const status = document.getElementById('search-status');
+  btn.disabled = true;
+  status.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">検索中...</span></div>';
+  try {
+    const res = await fetch(`${GAS_URL}?id=${encodeURIComponent(num)}`);
+    const data = await res.json();
+    if (data.name) {
+      productName = data.name;
+      const card = document.getElementById('product-name');
+      card.textContent = productName;
+      card.classList.remove('empty');
+      status.innerHTML = '<div class="status ok">取得しました</div>';
+    } else {
+      status.innerHTML = '<div class="status err">管理番号が見つかりませんでした</div>';
+      document.getElementById('product-name').textContent = '管理番号を検索すると表示されます';
+      document.getElementById('product-name').classList.add('empty');
+      productName = '';
+    }
+  } catch(e) {
+    status.innerHTML = `<div class="status err">接続エラー：${e.message}</div>`;
+  }
+  btn.disabled = false;
+}
+
+// 画像処理
+function handleImages(input) {
+  const files = Array.from(input.files);
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const id = Date.now() + Math.random();
+      imageDataList.push({ id, base64: e.target.result.split(',')[1], type: file.type, name: file.name });
+      renderPreviews();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+
+function renderPreviews() {
+  const preview = document.getElementById('img-preview');
+  const count = document.getElementById('img-count');
+  preview.innerHTML = '';
+  imageDataList.forEach(img => {
+    const wrap = document.createElement('div');
+    wrap.className = 'img-thumb-wrap';
+    wrap.innerHTML = `
+      <img src="data:${img.type};base64,${img.base64}" class="img-thumb"/>
+      <button class="img-remove" onclick="removeImage('${img.id}')">×</button>`;
+    preview.appendChild(wrap);
+  });
+  const c = imageDataList.length;
+  count.textContent = c > 0 ? `${c}枚選択中${c < 5 ? '（最低5枚必要です）' : ''}` : '';
+  count.style.color = c > 0 && c < 5 ? 'var(--danger)' : 'var(--text-muted)';
+}
+
+function removeImage(id) {
+  imageDataList = imageDataList.filter(img => img.id != id);
+  renderPreviews();
+}
+
+// 採寸テキスト変換
+function convertSizeText(text) {
+  const kanjiMap = {
+    '零':0,'〇':0,'一':1,'二':2,'三':3,'四':4,'五':5,
+    '六':6,'七':7,'八':8,'九':9,'十':10,
+    '百':100,'千':1000
+  };
+
+  // 漢数字→算用数字
+  function kanjiToNum(str) {
+    let result = 0;
+    let current = 0;
+    for (let i = 0; i < str.length; i++) {
+      const c = str[i];
+      const v = kanjiMap[c];
+      if (v === undefined) return null;
+      if (v === 10 || v === 100 || v === 1000) {
+        result += (current === 0 ? 1 : current) * v;
+        current = 0;
+      } else {
+        current = v;
+      }
+    }
+    return result + current;
+  }
+
+  // 漢数字の塊を変換
+  text = text.replace(/[零〇一二三四五六七八九十百千]+/g, match => {
+    const n = kanjiToNum(match);
+    return n !== null ? String(n) : match;
+  });
+
+  // 単位変換
+  text = text.replace(/センチメートル/g, 'cm');
+  text = text.replace(/センチ/g, 'cm');
+  text = text.replace(/ミリメートル/g, 'mm');
+  text = text.replace(/ミリ/g, 'mm');
+
+  // カタカナ→漢字
+  text = text.replace(/タテ/g, '縦');
+  text = text.replace(/ヨコ/g, '横');
+
+  // スペース整理
+  text = text.replace(/\s+/g, ' ').trim();
+
+  return text;
+}
+
+// 音声入力
+function startVoice(targetId, btn) {
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    alert('このブラウザは音声入力に対応していません。Chromeをお使いください。');
+    return;
+  }
+  if (recognition && activeVoiceBtn === btn) { recognition.stop(); return; }
+  if (recognition) recognition.stop();
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'ja-JP';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  activeVoiceBtn = btn;
+  btn.classList.add('recording');
+  recognition.onresult = e => {
+    let t = e.results[0][0].transcript;
+    if (targetId === 'size-data') t = convertSizeText(t);
+    const el = document.getElementById(targetId);
+    el.value += (el.value ? ' ' : '') + t;
+  };
+  recognition.onend = () => { btn.classList.remove('recording'); activeVoiceBtn = null; recognition = null; };
+  recognition.onerror = () => { btn.classList.remove('recording'); activeVoiceBtn = null; recognition = null; };
+  recognition.start();
+}
+
+// 提出処理
+async function submitAll() {
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  const sizeData = document.getElementById('size-data').value.trim();
+  const condNote = document.getElementById('cond-note').value.trim();
+  const workerCode = document.getElementById('worker-select').value;
+
+  if (!productName) { alert('先に管理番号を検索してください'); return; }
+  if (imageDataList.length < 5) { alert('画像を5枚以上追加してください'); return; }
+  if (imageDataList.length > 20) { alert('画像は20枚以内にしてください'); return; }
+  if (!workerCode) { alert('作業者を選択してください'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  const status = document.getElementById('submit-status');
+  btn.disabled = true;
+
+  status.innerHTML = `
+    <div class="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="progress-text" id="progress-text">Google認証中...</div>
+    </div>`;
+
+  try {
+    // Google認証
+    const token = await getAccessToken();
+    
+    // 画像アップロード
+    for (let i = 0; i < imageDataList.length; i++) {
+      const img = imageDataList[i];
+      const fileName = `${mgmtNum}_${String(i+1).padStart(2,'0')}.jpg`;
+      document.getElementById('progress-text').textContent = `画像をアップロード中... ${i+1}/${imageDataList.length}`;
+      await uploadToDrive(img.base64, fileName, DRIVE_FOLDER_ID, token);
+      const pct = Math.round((i + 1) / imageDataList.length * 80);
+      document.getElementById('progress-bar').style.width = pct + '%';
+    }
+
+    // スプレッドシートに保存
+    const checkedAcc = [];
+    document.querySelectorAll('.accessory-grid input[type="checkbox"]').forEach(cb => {
+      if (cb.checked && cb.dataset.output) checkedAcc.push(cb.dataset.output);
+    });
+    const accOther = document.getElementById('accessory-other').value.trim();
+    if (accOther) checkedAcc.push(accOther);
+    const accData = checkedAcc.length > 0 ? checkedAcc.join('、') : 'なし、本体のみ';
+
+    document.getElementById('progress-text').textContent = 'データを保存中...';
+    await fetch(`${GAS_URL}?action=savePhoto&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}`, {mode:'no-cors'});
+
+    document.getElementById('progress-bar').style.width = '100%';
+    status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 提出完了しました！リセットします...</div>';
+    setTimeout(() => resetForm(), 2000);
+  } catch(e) {
+    status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
+    btn.disabled = false;
+  }
+}
+
+function resetForm() {
+  document.getElementById('mgmt-num').value = '';
+  document.getElementById('product-name').textContent = '管理番号を検索すると表示されます';
+  document.getElementById('product-name').classList.add('empty');
+  document.getElementById('search-status').innerHTML = '';
+  document.getElementById('size-data').value = '';
+  document.getElementById('cond-note').value = '';
+  document.getElementById('worker-select').value = '';
+  document.querySelectorAll('.rank-btn').forEach(b => b.classList.remove('sel'));
+  selectedRank = '';
+  document.querySelectorAll('.accessory-grid input[type="checkbox"]').forEach(cb => cb.checked = false);
+  document.getElementById('accessory-other').value = '';
+  document.getElementById('img-preview').innerHTML = '';
+  document.getElementById('img-count').textContent = '';
+  document.getElementById('submit-status').innerHTML = '';
+  imageDataList = [];
+  productName = '';
+  document.getElementById('submit-btn').disabled = false;
+}
+</script>
+</body>
+</html>
