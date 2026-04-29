@@ -414,11 +414,62 @@ async function generateYahoo() {
   };
 
   const commentFull = condNote ? `${condNote}。${rankComment[selectedRank]}` : rankComment[selectedRank];
-  const imageContent = imageDataList.length > 0
-    ? imageDataList.map(img => ({ type:'image', source:{ type:'base64', media_type:img.type, data:img.base64 } }))
-    : [];
 
-  const yahooDesc = `ご覧いただきありがとうございます。
+  const prompt = `あなたはヤフオク出品アシスタントです。以下のルールで出力してください。
+
+【商品情報】
+管理番号：${mgmtNum}
+タイトル参考：${productName}（先頭の数字・記号は仕入先番号のため含めない）
+状態ランク：${selectedRank}
+採寸：${sizeData || 'なし'}
+状態特記：${condNote || 'なし'}
+
+【タイトルルール】
+・65文字以内、できるだけ65文字に近づける
+・先頭：S→【未使用保管品】/ SA→【未使用級】/ A→【極美品】/ AB,AB+,AB-→【美品】/ B,B+,B-,BC→なし
+・構成：【状態】ブランド英語 カタカナ ライン 素材 カテゴリ複数 用途 「鞄」or「財布」で締め
+・例：【極美品】FERRAGAMO サルヴァトーレ フェラガモ ショルダー メッセンジャー レザー ビジネス 鞄
+
+【出力ルール（厳守）】
+・コードブロック2つのみ
+・1つ目：タイトルのみ1行
+・2つ目：カラー名のみ1行（例：ダークブラウン系）
+・コードブロック外に文字一切書かない`;
+
+  const callAPI = async (p) => {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'generate', prompt: p })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.result;
+  };
+
+  const parseBlocks = (text) => {
+    return [...text.matchAll(/```[\s\S]*?```/g)].map(m => m[0].replace(/^```[^\n]*\n?/,'').replace(/\n?```$/,'').trim());
+  };
+
+  try {
+    let text = await callAPI(prompt);
+    let blocks = parseBlocks(text);
+    if (blocks.length < 2) throw new Error('出力フォーマットエラー。再度お試しください。');
+
+    let title = blocks[0];
+    const color = blocks[1] || 'ー';
+    let tLen = [...title].length;
+
+    if (tLen > 65) {
+      area.innerHTML = '<div class="loading" style="margin-top:1rem"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">65字超過のため修正中...</span></div>';
+      const fixPrompt = `以下のヤフオクタイトルが${tLen}文字あり65文字を超えています。65文字以内に収めてコードブロックで出力してください。コードブロック外には何も書かないでください。\n現在のタイトル：${title}`;
+      const fixText = await callAPI(fixPrompt);
+      const fixBlocks = parseBlocks(fixText);
+      if (fixBlocks.length > 0) { title = fixBlocks[0]; tLen = [...title].length; }
+    }
+
+    // 説明文をJS側で組み立て
+    const desc = `ご覧いただきありがとうございます。
 下記の商品説明をお読みいただいた上で、どうぞごゆっくりオークションをお楽しみください。
 (管理：${mgmtNum})
 
@@ -437,10 +488,10 @@ AB：使用感やダメージはあるが、ご使用には問題のない良い
 B：全体的に傷や汚れがあり、使用感をかなり感じるお品
 C： 全体的に傷や汚れ、ダメージがあり通常使用に問題のあるジャンクを含むお品
 
-◆COMMENT_PLACEHOLDER
+◆${commentFull}
 
 ◆カラー
-COLOR_PLACEHOLDER
+${color}
 
 ◆付属品
 ${accText}
@@ -466,7 +517,7 @@ ${accText}
 
 なるべく忠実に写真を写していますが、撮影環境や画面の色彩などによる若干の色味の違いはご了承下さい。 
 
- 細かい色の認識や、ブランド正式カラー名との相違、数センチの採寸相違などがある場合がございます。細かな点が気になる方はご入札をお控えください。
+細かい色の認識や、ブランド正式カラー名との相違、数センチの採寸相違などがある場合がございます。細かな点が気になる方はご入札をお控えください。
 
 出品するお品はほとんどが二次流通品となります。できるだけ画像や説明分で掲載するよう心掛けておりますが、掲載しきれない使用に問題の無い範囲のスレ/キズ/汚れ/ヒビ/型崩れ/変色/匂い/埃などがある場合がございますので予めご了承ください。
 
@@ -492,82 +543,8 @@ ${accText}
 
 ご入札・ご落札された方は、上記内容をご了承いただいたものとさせて頂きます。 
 
- ◆最後までお読みいただき誠にありがとうございます。 
+◆最後までお読みいただき誠にありがとうございます。 
 お取引終了まで迅速かつ丁寧に対応させて頂きますので、宜しくお願い致します。`;
-
-  const prompt = `あなたはヤフオク出品作成アシスタントです。以下のルールに厳密に従い出力してください。
-
-【商品情報】
-自社管理番号：${mgmtNum}
-自社商品タイトル（参考情報）：${productName}
-※先頭の数字・記号（例：305 - 4）は仕入先管理番号のため、タイトル生成時に含めない。
-商品状態ランク：${selectedRank}（ヤフオク表記：${yahooRank}）
-採寸データ：${sizeData || 'なし'}
-状態特記事項：${condNote || 'なし'}
-
-【①タイトルルール】
-・65文字以内（全文字1文字カウント、英数字・スペース含む）
-・65文字にできるだけ近づける
-・先頭に【】を挿入するランク：S→【未使用保管品】/ SA→【未使用級】/ A→【極美品】/ AB,AB+,AB-→【美品】/ B,B+,B-,BC→【】なし
-・構成：【状態】ブランド英語 ブランドカタカナ ライン 素材 カテゴリ複数 用途/シチュエーション 「鞄」または「財布」で締め
-・例：【希少モデル/極美品】FERAGAMO サルヴァトーレ フェラガモ メッセンジャーバッグ ショルダー レザー ビジネス 鞄
-・不足分はカテゴリ・用途ワードを追加して65文字に近づける
-
-【②出力フォーマット（絶対変更禁止）】
-${yahooDesc}
-
-【③COMMENT_PLACEHOLDERの差し替えルール】
-COMMENT_PLACEHOLDERを以下のコメント文に差し替えること：
-${commentFull}
-
-【④COLOR_PLACEHOLDERの差し替えルール】
-画像またはタイトル情報からカラーを判定して差し替えること。
-
-【⑤禁止事項】
-・推測での情報追加禁止・フォーマット改変禁止
-
-【出力ルール（厳守）】
-・コードブロック2つのみ
-・1つ目：タイトルのみ1行
-・2つ目：商品説明フォーマット全文
-・コードブロック外に文字一切書かない`;
-
-  const callAPI = async (prompt) => {
-    const res = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'generate', prompt })
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return data.result;
-  };
-
-  const parseBlocks = (text) => {
-    return [...text.matchAll(/```[\s\S]*?```/g)].map(m => m[0].replace(/^```[^\n]*\n?/,'').replace(/\n?```$/,'').trim());
-  };
-
-  try {
-    const msgContent = [...imageContent, { type:'text', text:prompt }];
-    const flatPrompt = imageContent.length > 0
-      ? prompt + '\n[画像あり：' + imageContent.length + '枚]'
-      : prompt;
-    let text = await callAPI(flatPrompt);
-    let blocks = parseBlocks(text);
-    if (blocks.length < 2) throw new Error('出力フォーマットエラー。再度お試しください。');
-
-    let title = blocks[0];
-    let tLen = [...title].length;
-
-    if (tLen > 65) {
-      area.innerHTML = '<div class="loading" style="margin-top:1rem"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">65字超過のため修正中...</span></div>';
-      const fixPrompt = `以下のヤフオクタイトルが${tLen}文字あり65文字を超えています。65文字以内に収めてコードブロックで出力してください。コードブロック外には何も書かないでください。\n現在のタイトル：${title}`;
-      const fixText = await callAPI(fixPrompt);
-      const fixBlocks = parseBlocks(fixText);
-      if (fixBlocks.length > 0) { title = fixBlocks[0]; tLen = [...title].length; }
-    }
-
-    const desc = blocks[1];
 
     // 作業者リスト取得
     let workerOptions = '<option value="">選択してください</option>';
