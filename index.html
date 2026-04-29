@@ -573,6 +573,14 @@ ${accText}
       </div>
       <div class="out-block">
         <div class="out-header">
+          <span class="out-label">出品価格</span>
+          <button class="copy-btn" onclick="copyText('p-out')">コピー</button>
+        </div>
+        <div class="out-text" id="p-out">${(productPrice && productPrice !== '') ? productPrice : '1000000'}</div>
+        ${(!productPrice || productPrice === '') ? `<div class="status err" style="margin-top:6px">⚠️ 価格未定のため下書き保存</div>` : ''}
+      </div>
+      <div class="out-block">
+        <div class="out-header">
           <span class="out-label">商品説明</span>
           <button class="copy-btn" onclick="copyText('d-out')">コピー</button>
         </div>
