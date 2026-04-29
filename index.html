@@ -454,7 +454,7 @@ async function generateYahoo() {
   try {
     let text = await callAPI(prompt);
     let blocks = parseBlocks(text);
-    if (blocks.length < 2) throw new Error('出力フォーマットエラー。再度お試しください。');
+    if (blocks.length < 2) throw new Error('フォーマットエラー｜受信内容：' + text.substring(0, 200));
 
     let title = blocks[0];
     const color = blocks[1] || 'ー';
