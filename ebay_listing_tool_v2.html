@@ -1098,7 +1098,7 @@ function jaToEnBrand(s) {
   return map[s] || s;
 }
 function jaToEnMaterial(s) {
-  const map = { 'レザー':'Leather','キャンバス':'Canvas','ナイロン':'Nylon','スエード':'Suede','PVC':'PVC','エナメル':'Patent Leather','クロコ':'Crocodile','ゴールド':'Gold','シルバー':'Silver','プラチナ':'Platinum','マカダム':'Macadam Canvas','モノグラム':'Monogram Canvas','ダミエ':'Damier Canvas','GGキャンバス':'GG Canvas','シェブロン':'Chevron','ラムスキン':'Lambskin','カーフスキン':'Calfskin','コードバン':'Cordovan','ヴェルニ':'Vernis','エピ':'Epi Leather','トリオンフ':'Triomphe Canvas','マトラッセ':'Matelasse','クイルティング':'Quilted Leather','ツイード':'Tweed','デニム':'Denim','ラフィア':'Raffia','サテン':'Satin','ベルベット':'Velvet' };
+  const map = { 'レザー':'Leather','キャンバス':'Canvas','ナイロン':'Nylon','スエード':'Suede','PVC':'PVC','エナメル':'Patent Leather','クロコ':'Crocodile','クロコダイル':'Crocodile','クロコダイルレザー':'Crocodile Leather','ゴールド':'Gold','シルバー':'Silver','プラチナ':'Platinum','マカダム':'Macadam Canvas','モノグラム':'Monogram Canvas','ダミエ':'Damier Canvas','GGキャンバス':'GG Canvas','シェブロン':'Chevron','ラムスキン':'Lambskin','カーフスキン':'Calfskin','コードバン':'Cordovan','ヴェルニ':'Vernis','エピ':'Epi Leather','トリオンフ':'Triomphe Canvas','マトラッセ':'Matelasse','クイルティング':'Quilted Leather','ツイード':'Tweed','デニム':'Denim','ラフィア':'Raffia','サテン':'Satin','ベルベット':'Velvet' };
   for (const [k,v] of Object.entries(map)) { if (s.includes(k)) s = s.replace(k, v); }
   return s;
 }
@@ -1107,21 +1107,18 @@ function jaToEnColor(s) {
   return map[s] || s;
 }
 function jaToEnOdor(s) {
-  const map = {
-    'におい有':'Some odor present.',
-    'においあり':'Some odor present.',
-    '臭いあり':'Some odor present.',
-    '臭い有':'Some odor present.',
-    'タバコ臭':'Slight tobacco smell.',
-    'カビ臭':'Slight musty smell.',
-    'においなし':'No strong odor.',
-    'においなし。':'No strong odor.',
-    'なし':'No strong odor.',
-  };
-  for (const [k, v] of Object.entries(map)) {
-    if (s.includes(k)) return v;
+  const t = s.trim();
+  // 「におい・匂い・臭い・ニオイ」+「あり・有・アリ・ある」の全パターン
+  if (/[においニオイ匂臭][いイ]?\s*(あり|有|アリ|ある)/i.test(t)) {
+    if (/タバコ|たばこ/i.test(t)) return 'Slight tobacco smell.';
+    if (/カビ|かび/i.test(t)) return 'Slight musty smell.';
+    return 'Some odor present.';
   }
-  // 日本語が残っている場合はそのまま返す（後でAI翻訳で対応）
+  // なし系
+  if (/[においニオイ匂臭][いイ]?\s*(なし|無し|ナシ|ない)/i.test(t)) return 'No strong odor.';
+  if (/^なし$|^ナシ$|^無し$/i.test(t)) return 'No strong odor.';
+  if (/タバコ臭|たばこ臭/i.test(t)) return 'Slight tobacco smell.';
+  if (/カビ臭|かび臭/i.test(t)) return 'Slight musty smell.';
   return s;
 }
 
