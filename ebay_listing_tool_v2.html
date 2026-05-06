@@ -753,13 +753,33 @@ async function translateNotes() {
 }
 
 // 特記事項を先頭に組み込んだConditionテキスト生成
-function buildConditionText() {
+async function buildConditionText() {
   const base  = COND_TEXT[currentGrade] || 'Used condition. Please check photos for details.';
   const prev  = document.getElementById('notes-preview');
-  const extra = (prev.style.display !== 'none') ? prev.textContent.trim() : '';
+  const jaText = document.getElementById('f-notes-ja').value.trim();
+
+  // プレビュー済みの英語訳があればそれを使う
+  let extra = (prev.style.display !== 'none') ? prev.textContent.trim() : '';
+
+  // プレビューがなく日本語特記事項がある場合は自動翻訳
+  if (!extra && jaText) {
+    try {
+      const translatePrompt = `Translate the following Japanese condition notes for a luxury secondhand item into concise, natural English. Return ONLY the translated text, nothing else.\n\n${jaText}`;
+      const res = await fetch(`${GAS_URL}?action=generate&prompt=${encodeURIComponent(translatePrompt)}`);
+      const data = await res.json();
+      if (data.result) {
+        extra = data.result.trim();
+        // プレビューにも反映
+        prev.textContent = extra;
+        prev.style.display = 'block';
+      }
+    } catch(e) {}
+  }
+
   if (!extra) return base;
-  // 特記事項を冒頭に組み込む
-  return `${extra} ${base}`;
+  // 特記事項を冒頭に自然につなげる（末尾にピリオドを確保）
+  const extraClean = extra.replace(/\.?$/, '.');
+  return `${extraClean} ${base}`;
 }
 
 // ─── 付属品 ───────────────────────────────────────
@@ -854,7 +874,7 @@ Rules (STRICTLY enforce all):
 }
 
 // ─── 生成 ─────────────────────────────────────────
-function generate() {
+async function generate() {
   const title = document.getElementById('title-input').value.trim();
   const price = document.getElementById('price-usd').value.trim();
   const mgmt  = document.getElementById('mgmt-num').value.trim();
@@ -865,7 +885,9 @@ function generate() {
   if (!currentGrade)    { showStatus('コンディションを選択してください', 'error'); return; }
   if (!price)           { showStatus('販売価格を入力してください', 'error'); return; }
 
-  const html = buildHTML(title, mgmt, price);
+  showStatus('説明文を生成中...', 'loading');
+  const condText = await buildConditionText();
+  const html = buildHTML(title, mgmt, price, condText);
 
   showEl('out-title-card'); document.getElementById('out-title-text').textContent = title;
   showEl('out-price-card'); document.getElementById('out-price-text').textContent = `$${parseFloat(price).toFixed(2)}`;
@@ -928,7 +950,7 @@ async function saveAndReset() {
 }
 
 // ─── HTMLビルド ───────────────────────────────────
-function buildHTML(title, mgmt, price) {
+function buildHTML(title, mgmt, price, condText) {
   const brand    = document.getElementById('f-brand').value.trim();
   const material = document.getElementById('f-material').value.trim();
   const color    = document.getElementById('f-color').value.trim();
@@ -936,7 +958,7 @@ function buildHTML(title, mgmt, price) {
   const odor     = odorRaw || 'No strong odor.';
   const others   = '';
   const accText  = getAccText();
-  const cond     = buildConditionText();
+  const cond     = condText || 'Used condition. Please check photos for details.';
 
   // カテゴリ別 → 英語変換
   let dynRows = '';
@@ -1058,7 +1080,7 @@ function jaToEnBrand(s) {
   return map[s] || s;
 }
 function jaToEnMaterial(s) {
-  const map = { 'レザー':'Leather','キャンバス':'Canvas','ナイロン':'Nylon','スエード':'Suede','PVC':'PVC','エナメル':'Patent Leather','クロコ':'Crocodile','ゴールド':'Gold','シルバー':'Silver','プラチナ':'Platinum' };
+  const map = { 'レザー':'Leather','キャンバス':'Canvas','ナイロン':'Nylon','スエード':'Suede','PVC':'PVC','エナメル':'Patent Leather','クロコ':'Crocodile','ゴールド':'Gold','シルバー':'Silver','プラチナ':'Platinum','マカダム':'Macadam Canvas','モノグラム':'Monogram Canvas','ダミエ':'Damier Canvas','GGキャンバス':'GG Canvas','シェブロン':'Chevron','ラムスキン':'Lambskin','カーフスキン':'Calfskin','コードバン':'Cordovan','ヴェルニ':'Vernis','エピ':'Epi Leather','トリオンフ':'Triomphe Canvas','マトラッセ':'Matelasse','クイルティング':'Quilted Leather','ツイード':'Tweed','デニム':'Denim','ラフィア':'Raffia','サテン':'Satin','ベルベット':'Velvet' };
   for (const [k,v] of Object.entries(map)) { if (s.includes(k)) s = s.replace(k, v); }
   return s;
 }
@@ -1067,8 +1089,9 @@ function jaToEnColor(s) {
   return map[s] || s;
 }
 function jaToEnStyle(s) {
-  const map = { 'トートバッグ':'Tote Bag','ショルダーバッグ':'Shoulder Bag','ハンドバッグ':'Handbag','クラッチ':'Clutch','リュック':'Backpack','バックパック':'Backpack','ポーチ':'Pouch','長財布':'Long Wallet','二つ折り財布':'Bifold Wallet','コインケース':'Coin Purse','リング':'Ring','ネックレス':'Necklace','ブレスレット':'Bracelet','イヤリング':'Earrings','ピアス':'Earrings','ブローチ':'Brooch','スカーフ':'Scarf','ベルト':'Belt','時計':'Watch','サングラス':'Sunglasses' };
-  return map[s] || s;
+  const map = { 'トートバッグ':'Tote Bag','ショルダーバッグ':'Shoulder Bag','ハンドバッグ':'Handbag','クラッチ':'Clutch','リュック':'Backpack','バックパック':'Backpack','ポーチ':'Pouch','ミニバッグ':'Mini Bag','クロスボディ':'Crossbody Bag','ボストンバッグ':'Boston Bag','長財布':'Long Wallet','二つ折り財布':'Bifold Wallet','三つ折り財布':'Trifold Wallet','コインケース':'Coin Purse','カードケース':'Card Case','リング':'Ring','ネックレス':'Necklace','ブレスレット':'Bracelet','イヤリング':'Earrings','ピアス':'Earrings','ブローチ':'Brooch','スカーフ':'Scarf','ベルト':'Belt','時計':'Watch','サングラス':'Sunglasses' };
+  // スペース・全角スペース区切りで複数ワード対応
+  return s.split(/[\s　]+/).map(w => map[w] || w).join(' / ');
 }
 
 // cmをインチ変換してフォーマット
