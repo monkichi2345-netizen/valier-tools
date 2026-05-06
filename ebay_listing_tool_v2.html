@@ -963,11 +963,23 @@ async function saveAndReset() {
 
 // ─── HTMLビルド ───────────────────────────────────
 async function buildHTML(title, mgmt, price, condText) {
-  const brand    = document.getElementById('f-brand').value.trim();
-  const material = document.getElementById('f-material').value.trim();
-  const color    = document.getElementById('f-color').value.trim();
-  const odorRaw  = document.getElementById('f-odor').value.trim();
-  const odor     = odorRaw ? jaToEnOdor(odorRaw) : 'No strong odor.';
+  const brandRaw    = document.getElementById('f-brand').value.trim();
+  const materialRaw = document.getElementById('f-material').value.trim();
+  const colorRaw    = document.getElementById('f-color').value.trim();
+  const odorRaw     = document.getElementById('f-odor').value.trim();
+
+  // まとめてAI翻訳（日本語が含まれる場合のみ）
+  const [brand, material, color, odorEn] = await Promise.all([
+    aiTranslate(brandRaw, 'luxury brand name'),
+    aiTranslate(materialRaw, 'luxury item material name'),
+    aiTranslate(colorRaw, 'color name'),
+    odorRaw ? (async () => {
+      const quick = jaToEnOdor(odorRaw);
+      if (quick !== odorRaw) return quick;
+      return await aiTranslate(odorRaw, 'odor/smell description for a secondhand item');
+    })() : Promise.resolve('No strong odor.')
+  ]);
+  const odor     = odorEn || 'No strong odor.';
   const others   = '';
   const accText  = await getAccText();
   const cond     = condText || 'Used condition. Please check photos for details.';
@@ -975,12 +987,16 @@ async function buildHTML(title, mgmt, price, condText) {
   // カテゴリ別 → 英語変換
   let dynRows = '';
   if (currentCat === 'bag') {
-    const style  = document.getElementById('f-bag-style').value.trim();
+    const styleRaw = document.getElementById('f-bag-style').value.trim();
     const w      = toEnSize(document.getElementById('f-bag-w').value.trim());
     const h      = toEnSize(document.getElementById('f-bag-h').value.trim());
     const d      = toEnSize(document.getElementById('f-bag-d').value.trim());
-    const handle = toEnHandle(document.getElementById('f-bag-handle').value.trim());
-    if (style)   dynRows += row('Style', jaToEnStyle(style));
+    const handleRaw = document.getElementById('f-bag-handle').value.trim();
+    const styleEn = jaToEnStyle(styleRaw);
+    const style = /[\u3040-\u30ff\u4e00-\u9fff]/.test(styleEn) ? await aiTranslate(styleRaw, 'bag style type') : styleEn;
+    const handleEn = toEnHandle(handleRaw);
+    const handle = /[\u3040-\u30ff\u4e00-\u9fff]/.test(handleEn) ? await aiTranslate(handleRaw, 'bag handle/strap length description') : handleEn;
+    if (style)   dynRows += row('Style', style);
     if (w||h||d) {
       const sv = [w?`Width: ${w}`:'', h?`Height: ${h}`:'', d?`Depth: ${d}`:''].filter(Boolean).join('<br>');
       dynRows += row('Size', sv, true);
@@ -994,7 +1010,9 @@ async function buildHTML(title, mgmt, price, condText) {
     const w     = toEnSize(document.getElementById('f-wallet-w').value.trim());
     const h     = toEnSize(document.getElementById('f-wallet-h').value.trim());
     const d     = toEnSize(document.getElementById('f-wallet-d').value.trim());
-    if (style)   dynRows += row('Style', jaToEnStyle(style));
+    const walletStyleEn = jaToEnStyle(style);
+    const walletStyle = /[\u3040-\u30ff\u4e00-\u9fff]/.test(walletStyleEn) ? await aiTranslate(style, 'wallet style type') : walletStyleEn;
+    if (walletStyle) dynRows += row('Style', walletStyle);
     if (w||h||d) {
       const sv = [w?`Width: ${w}`:'', h?`Height: ${h}`:'', d?`Depth: ${d}`:''].filter(Boolean).join('<br>');
       dynRows += row('Size', sv, true);
@@ -1006,7 +1024,9 @@ async function buildHTML(title, mgmt, price, condText) {
     const type  = document.getElementById('f-acc-type').value.trim();
     const s1    = document.getElementById('f-acc-size1').value.trim();
     const s2    = document.getElementById('f-acc-size2').value.trim();
-    if (type) dynRows += row('Jewelry Type', jaToEnStyle(type));
+    const typeEn = jaToEnStyle(type);
+    const typeEnFinal = /[\u3040-\u30ff\u4e00-\u9fff]/.test(typeEn) ? await aiTranslate(type, 'jewelry type') : typeEn;
+    if (typeEnFinal) dynRows += row('Jewelry Type', typeEnFinal);
     if (s1||s2) {
       const sv = [s1, s2].filter(Boolean).join('<br>');
       dynRows += row('Size / Length', sv, true);
@@ -1016,7 +1036,9 @@ async function buildHTML(title, mgmt, price, condText) {
   } else {
     const type = document.getElementById('f-other-type').value.trim();
     const size = document.getElementById('f-other-size').value.trim();
-    if (type) dynRows += row('Item Type', jaToEnStyle(type));
+    const otherTypeEn = jaToEnStyle(type);
+    const otherTypeFinal = /[\u3040-\u30ff\u4e00-\u9fff]/.test(otherTypeEn) ? await aiTranslate(type, 'item type') : otherTypeEn;
+    if (otherTypeFinal) dynRows += row('Item Type', otherTypeFinal);
     if (size) dynRows += row('Size', size);
     dynRows += row('Accessories', accText);
     dynRows += row('Condition', cond);
@@ -1025,9 +1047,9 @@ async function buildHTML(title, mgmt, price, condText) {
 
   const allRows = `
     ${row('Management Number', mgmt || '—')}
-    ${row('Brand', jaToEnBrand(brand) || '—')}
-    ${row('Material', jaToEnMaterial(material) || '—')}
-    ${row('Color', jaToEnColor(color) || '—')}
+    ${row('Brand', brand || '—')}
+    ${row('Material', material || '—')}
+    ${row('Color', color || '—')}
     ${dynRows}
   `;
 
@@ -1087,6 +1109,18 @@ function sec(title, body) {
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ─── 日本語→英語変換ヘルパー ────────────────────────
+async function aiTranslate(text, context) {
+  if (!text) return text;
+  // 日本語・カタカナが含まれていない場合はそのまま返す
+  if (!/[\u3040-\u30ff\u4e00-\u9fff]/.test(text)) return text;
+  try {
+    const prompt = 'Translate the following ' + context + ' into English. Return ONLY the English translation, nothing else.\n\n' + text;
+    const res = await fetch(GAS_URL + '?action=generate&prompt=' + encodeURIComponent(prompt));
+    const data = await res.json();
+    return data.result ? data.result.trim() : text;
+  } catch(e) { return text; }
+}
+
 function jaToEnBrand(s) {
   const map = { 'グッチ':'GUCCI','ルイヴィトン':'LOUIS VUITTON','シャネル':'CHANEL','プラダ':'PRADA','セリーヌ':'CELINE','ロエベ':'LOEWE','エルメス':'HERMES','ティファニー':'TIFFANY & CO.','カルティエ':'CARTIER','ブルガリ':'BVLGARI','コーチ':'COACH','バレンシアガ':'BALENCIAGA','ボッテガヴェネタ':'BOTTEGA VENETA','フェンディ':'FENDI','バーバリー':'BURBERRY','ディオール':'DIOR','サンローラン':'SAINT LAURENT','ジバンシー':'GIVENCHY','ヴァレンティノ':'VALENTINO','ジミーチュウ':'JIMMY CHOO' };
   return map[s] || s;
