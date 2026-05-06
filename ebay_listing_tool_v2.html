@@ -432,24 +432,6 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
 
 <!-- 出力 -->
 <div id="output-section">
-  <!-- 作業者・保存 -->
-  <div class="output-card" id="out-worker-card">
-    <div class="output-head">
-      <span class="output-head-title">出品実績の保存</span>
-    </div>
-    <div class="output-body">
-      <div class="field-label" style="margin-bottom:6px;">作業者を選択してください</div>
-      <select id="worker-select" onchange="checkSaveBtn()" style="width:100%;font-family:inherit;font-size:13px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);color:var(--text);margin-bottom:12px;">
-        <option value="">選択してください</option>
-      </select>
-      <button id="save-btn" onclick="saveAndReset()" disabled
-        style="width:100%;padding:13px;background:#2d7a4a;color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .2s;opacity:.4;">
-        出品実績を保存してリセット
-      </button>
-      <div id="save-status" style="margin-top:8px;font-family:'DM Mono',monospace;font-size:11px;"></div>
-    </div>
-  </div>
-
   <div class="output-card" id="out-title-card">
     <div class="output-head">
       <span class="output-head-title">eBayタイトル</span>
@@ -472,6 +454,23 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
     <div class="output-body">
       <div id="out-desc-preview" style="font-size:13px;line-height:1.6;"></div>
       <textarea id="out-desc-raw" style="display:none;"></textarea>
+    </div>
+  </div>
+  <!-- 作業者・保存 -->
+  <div class="output-card" id="out-worker-card">
+    <div class="output-head">
+      <span class="output-head-title">出品実績の保存</span>
+    </div>
+    <div class="output-body">
+      <div class="field-label" style="margin-bottom:6px;">作業者を選択してください</div>
+      <select id="worker-select" onchange="checkSaveBtn()" style="width:100%;font-family:inherit;font-size:13px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);color:var(--text);margin-bottom:12px;">
+        <option value="">選択してください</option>
+      </select>
+      <button id="save-btn" onclick="saveAndReset()" disabled
+        style="width:100%;padding:13px;background:#2d7a4a;color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .2s;opacity:.4;">
+        出品実績を保存してリセット
+      </button>
+      <div id="save-status" style="margin-top:8px;font-family:'DM Mono',monospace;font-size:11px;"></div>
     </div>
   </div>
 </div>
@@ -792,30 +791,25 @@ function restoreAcc(str) {
   });
 }
 
-function getAccText() {
+async function getAccText() {
   const selected = Array.from(document.querySelectorAll('.acc-btn.on')).map(b => b.dataset.out);
   const free = document.getElementById('acc-free').value.trim();
   if (free) {
-    // フリーワードの日本語→英語変換
-    const freeEn = jaToEnAcc(free);
-    selected.push(freeEn);
+    // 日本語が含まれている場合はAIで英語変換
+    if (/[\u3040-\u30ff\u4e00-\u9fff]/.test(free)) {
+      try {
+        const prompt = 'Translate the following Japanese/katakana accessory name(s) into English. Every word must be in English, no Japanese or katakana allowed in the output. Return ONLY the English translation, comma-separated if multiple. Do not include any explanation.\n\n' + free;
+        const res = await fetch(GAS_URL + '?action=generate&prompt=' + encodeURIComponent(prompt));
+        const data = await res.json();
+        if (data.result) selected.push(data.result.trim());
+        else selected.push(free);
+      } catch(e) { selected.push(free); }
+    } else {
+      selected.push(free);
+    }
   }
   if (!selected.length) return 'No item box or dust bag. Only accessories shown in photos.';
   return selected.join(', ') + '.';
-}
-
-function jaToEnAcc(s) {
-  const map = {
-    'リボン':'Ribbon','チャーム':'Charm','鍵':'Key','南京錠':'Padlock','ロック':'Lock',
-    'ベルト':'Belt','ポーチ':'Pouch','コイン':'Coin Purse','カード':'Card','タグ':'Tag',
-    'クリップ':'Clip','ブラシ':'Brush','クロス':'Cleaning Cloth','袋':'Bag',
-    '巾着':'Drawstring Bag','ハンガー':'Hanger','ケース':'Case','保証書':'Warranty Card',
-    '説明書':'Manual','領収書':'Receipt'
-  };
-  for (const [k, v] of Object.entries(map)) {
-    if (s.includes(k)) s = s.replace(k, v);
-  }
-  return s;
 }
 
 // ─── 価格計算 ─────────────────────────────────────
@@ -905,7 +899,7 @@ async function generate() {
 
   showStatus('説明文を生成中...', 'loading');
   const condText = await buildConditionText();
-  const html = buildHTML(title, mgmt, price, condText);
+  const html = await buildHTML(title, mgmt, price, condText);
 
   showEl('out-title-card'); document.getElementById('out-title-text').textContent = title;
   showEl('out-price-card'); document.getElementById('out-price-text').textContent = `$${parseFloat(price).toFixed(2)}`;
@@ -968,14 +962,14 @@ async function saveAndReset() {
 }
 
 // ─── HTMLビルド ───────────────────────────────────
-function buildHTML(title, mgmt, price, condText) {
+async function buildHTML(title, mgmt, price, condText) {
   const brand    = document.getElementById('f-brand').value.trim();
   const material = document.getElementById('f-material').value.trim();
   const color    = document.getElementById('f-color').value.trim();
   const odorRaw  = document.getElementById('f-odor').value.trim();
   const odor     = odorRaw ? jaToEnOdor(odorRaw) : 'No strong odor.';
   const others   = '';
-  const accText  = getAccText();
+  const accText  = await getAccText();
   const cond     = condText || 'Used condition. Please check photos for details.';
 
   // カテゴリ別 → 英語変換
