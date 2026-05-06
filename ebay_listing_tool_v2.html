@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eBay出品ツール</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f0eb;
+  --surface: #ffffff;
+  --surface2: #faf7f4;
+  --border: #e0d8d0;
+  --accent: #7a1f2b;
+  --accent-light: #f5e9eb;
+  --accent2: #c49a3c;
+  --text: #2a2018;
+  --text-muted: #8a7a6a;
+  --green: #2d7a4a;
+  --green-bg: #edf6f1;
+  --red: #c0392b;
+  --red-bg: #fdf0ee;
+  --radius: 8px;
+  --shadow: 0 2px 12px rgba(42,32,24,.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; min-height: 100vh; padding: 20px 16px 100px; }
+
+/* Header */
+.header { text-align: center; padding: 20px 0 24px; }
+.header-eyebrow { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .25em; color: var(--accent); text-transform: uppercase; margin-bottom: 6px; }
+.header h1 { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 700; color: var(--accent); }
+.header-line { width: 40px; height: 2px; background: var(--accent2); margin: 10px auto 0; }
+
+/* Card */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
+.card-label { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .2em; color: var(--accent); text-transform: uppercase; font-weight: 500; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+.card-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* Fields */
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.field-label { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+input, textarea, select { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 13px; padding: 9px 13px; width: 100%; outline: none; transition: border-color .2s, box-shadow .2s; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(122,31,43,.08); }
+input::placeholder, textarea::placeholder { color: #bbb0a5; }
+textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
+.input-row { display: flex; gap: 8px; align-items: stretch; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* Buttons */
+.btn { border: none; border-radius: var(--radius); cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 13px; padding: 9px 16px; transition: all .15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #961828; }
+.btn-secondary { background: var(--accent-light); color: var(--accent); border: 1px solid rgba(122,31,43,.2); }
+.btn-secondary:hover { background: #eddde0; }
+.btn-ghost { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-sm { font-size: 11px; padding: 6px 11px; }
+.btn-icon { width: 36px; height: 36px; padding: 0; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Voice */
+.voice-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 0 12px; transition: all .2s; display: flex; align-items: center; flex-shrink: 0; }
+.voice-btn:hover { border-color: var(--accent); }
+.voice-btn.recording { border-color: var(--red); color: var(--red); animation: pulse .8s infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+
+/* Step badge */
+.step-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--accent); color: #fff; border-radius: 50%; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+
+/* Info card */
+.info-card { background: var(--accent-light); border: 1px solid rgba(122,31,43,.2); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; display: none; }
+.info-card.visible { display: block; }
+.info-name { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+.info-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.info-tag { background: #fff; border: 1px solid var(--border); border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); padding: 2px 7px; }
+.info-tag b { color: var(--text); }
+
+/* AI解析結果 */
+.analysis-block { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; display: none; }
+.analysis-block.visible { display: block; }
+.analysis-item { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+.analysis-item:last-child { margin-bottom: 0; }
+.analysis-label { font-size: 11px; font-weight: 600; color: var(--text-muted); min-width: 80px; padding-top: 9px; }
+.analysis-input { flex: 1; }
+
+/* カテゴリボタン */
+.cat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
+.cat-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 10px 4px 8px; text-align: center; transition: all .15s; }
+.cat-btn:hover { border-color: var(--accent); }
+.cat-btn.active { background: var(--accent); border-color: var(--accent); }
+.cat-btn .cat-icon { font-size: 18px; display: block; margin-bottom: 3px; }
+.cat-btn .cat-name { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.cat-btn.active .cat-name { color: #fff; }
+
+/* コンディションボタン */
+.cond-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 5px; }
+.cond-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; display: flex; flex-direction: column; align-items: center; padding: 9px 3px 7px; transition: all .15s; gap: 1px; }
+.cond-btn:hover { border-color: var(--accent); }
+.cond-btn.active { background: var(--accent-light); border-color: var(--accent); }
+.cond-num { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent2); font-weight: 500; }
+.cond-name { font-size: 12px; font-weight: 700; color: var(--text); }
+.cond-btn.active .cond-name { color: var(--accent); }
+.cond-sub { font-size: 8px; color: var(--text-muted); text-align: center; line-height: 1.3; }
+
+/* 付属品 */
+.acc-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.acc-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: 500; padding: 5px 11px; transition: all .15s; }
+.acc-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+.acc-btn.on { background: rgba(196,154,60,.12); border-color: var(--accent2); color: var(--accent2); font-weight: 600; }
+
+/* 価格 */
+.price-result { background: linear-gradient(135deg, #7a1f2b, #9e2a38); border-radius: var(--radius); padding: 14px; text-align: center; display: none; margin-top: 10px; }
+.price-result.visible { display: block; }
+.price-result-label { font-size: 9px; letter-spacing: .15em; color: rgba(255,255,255,.6); text-transform: uppercase; font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+.price-result-val { font-family: 'Playfair Display', serif; font-size: 28px; color: #fff; font-weight: 700; }
+
+/* タイトル文字数 */
+.title-wrap { position: relative; }
+.char-badge { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-family: 'DM Mono', monospace; font-size: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 1px 7px; color: var(--text-muted); pointer-events: none; }
+.char-badge.over { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+.char-badge.good { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+#title-input { padding-right: 62px; }
+
+/* ステータス */
+.status { font-family: 'DM Mono', monospace; font-size: 11px; padding: 9px 13px; border-radius: var(--radius); margin-bottom: 12px; display: none; }
+.status.show { display: block; }
+.status.loading { background: rgba(122,31,43,.06); border: 1px solid rgba(122,31,43,.2); color: var(--accent); }
+.status.error { background: var(--red-bg); border: 1px solid rgba(192,57,43,.3); color: var(--red); }
+.status.success { background: var(--green-bg); border: 1px solid rgba(45,122,74,.3); color: var(--green); }
+
+/* 出力 */
+.output-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; display: none; box-shadow: var(--shadow); }
+.output-card.visible { display: block; }
+.output-head { background: var(--accent); color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+.output-head-title { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-family: 'DM Mono', monospace; }
+.output-body { padding: 14px; }
+.output-text { font-family: 'DM Mono', monospace; font-size: 11px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
+.copy-btn { background: rgba(255,255,255,.2); color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-family: 'Outfit', sans-serif; font-weight: 600; padding: 4px 10px; }
+
+/* 生成ボタン */
+.gen-section { position: sticky; bottom: 14px; z-index: 10; padding-top: 6px; }
+.gen-btn { width: 100%; padding: 15px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); cursor: pointer; font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; transition: all .2s; box-shadow: 0 4px 20px rgba(122,31,43,.35); }
+.gen-btn:hover { background: #961828; transform: translateY(-2px); box-shadow: 0 8px 28px rgba(122,31,43,.4); }
+.gen-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.reset-row { display: flex; justify-content: center; margin-top: 10px; }
+.divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+/* 画像アップロード */
+.img-upload-area { border: 2px dashed var(--border); border-radius: var(--radius); padding: 20px; text-align: center; cursor: pointer; transition: all .2s; background: var(--surface2); }
+.img-upload-area:hover { border-color: var(--accent); }
+.img-upload-area.has-img { border-color: var(--accent2); background: rgba(196,154,60,.05); }
+.img-preview { max-width: 100%; max-height: 160px; border-radius: 6px; margin-top: 8px; display: none; }
+.img-preview.visible { display: block; margin: 8px auto 0; }
+
+/* 動的セクション */
+.dyn-sec { display: none; }
+.dyn-sec.visible { display: block; }
+
+/* 特記事項プレビュー */
+.notes-preview { display: none; margin-top: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; font-family: 'DM Mono', monospace; font-size: 11px; line-height: 1.7; color: var(--text); }
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-eyebrow">VALIER</div>
+  <h1>eBay出品ツール</h1>
+  <div class="header-line"></div>
+</div>
+
+<!-- STEP 1: インプット -->
+<div class="card">
+  <div class="card-label"><span class="step-badge">1</span> 商品情報の取り込み</div>
+
+  <div class="field">
+    <div class="field-label">管理番号（6桁）</div>
+    <div class="input-row">
+      <input type="text" id="mgmt-num" placeholder="例：137255" maxlength="6" inputmode="numeric">
+      <button class="voice-btn btn-icon" onclick="startVoice('mgmt-num')">🎤</button>
+      <button class="btn btn-primary" onclick="fetchProduct()">検索</button>
+    </div>
+    <div class="info-card" id="info-card">
+      <div class="info-name" id="info-name">—</div>
+      <div class="info-tags" id="info-tags"></div>
+      <div id="folder-btn-area" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+    </div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">サンプル画像（1枚・AI解析用）</div>
+    <div class="img-upload-area" id="upload-area" onclick="document.getElementById('img-input').click()">
+      <div id="upload-hint">📷 タップして画像を選択</div>
+      <img class="img-preview" id="img-preview" src="">
+    </div>
+    <input type="file" id="img-input" accept="image/*" style="display:none" onchange="handleImage(this)">
+  </div>
+
+  <div style="margin-top:8px;">
+    <button class="btn btn-primary" style="width:100%;padding:12px;" id="analyze-btn" onclick="analyzeProduct()" disabled>
+      🔍 AI解析開始
+    </button>
+  </div>
+</div>
+
+<!-- STEP 2: AI解析結果・日本語で確認 -->
+<div class="card" id="step2-card" style="display:none;">
+  <div class="card-label"><span class="step-badge">2</span> 解析結果の確認・修正（日本語）</div>
+
+  <!-- カテゴリ -->
+  <div class="field">
+    <div class="field-label">カテゴリ</div>
+    <div class="cat-grid">
+      <button class="cat-btn" data-cat="bag" onclick="selectCat(this)">
+        <span class="cat-icon">👜</span><span class="cat-name">バッグ</span>
+      </button>
+      <button class="cat-btn" data-cat="wallet" onclick="selectCat(this)">
+        <span class="cat-icon">👛</span><span class="cat-name">財布</span>
+      </button>
+      <button class="cat-btn" data-cat="accessory" onclick="selectCat(this)">
+        <span class="cat-icon">💍</span><span class="cat-name">アクセサリー</span>
+      </button>
+      <button class="cat-btn" data-cat="other" onclick="selectCat(this)">
+        <span class="cat-icon">✨</span><span class="cat-name">その他</span>
+      </button>
+    </div>
+    <div style="margin-top:6px; font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);" id="fee-display"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 共通フィールド -->
+  <div class="field">
+    <div class="field-label">ブランド</div>
+    <div class="input-row">
+      <input type="text" id="f-brand" placeholder="例：グッチ">
+      <button class="voice-btn btn-icon" onclick="startVoice('f-brand')">🎤</button>
+    </div>
+  </div>
+  <div class="field">
+    <div class="field-label">素材</div>
+    <div class="input-row">
+      <input type="text" id="f-material" placeholder="例：GGキャンバス / レザー">
+      <button class="voice-btn btn-icon" onclick="startVoice('f-material')">🎤</button>
+    </div>
+  </div>
+  <div class="field">
+    <div class="field-label">カラー</div>
+    <div class="input-row">
+      <input type="text" id="f-color" placeholder="例：ブラウン / ベージュ">
+      <button class="voice-btn btn-icon" onclick="startVoice('f-color')">🎤</button>
+    </div>
+  </div>
+
+  <!-- バッグ -->
+  <div class="dyn-sec" id="sec-bag">
+    <div class="field">
+      <div class="field-label">スタイル</div>
+      <input type="text" id="f-bag-style" placeholder="例：トートバッグ / ショルダーバッグ">
+    </div>
+    <div class="field">
+      <div class="field-label">サイズ（横・縦・奥行き）</div>
+      <div class="two-col" style="margin-bottom:6px;">
+        <input type="text" id="f-bag-w" placeholder="横：__cm">
+        <input type="text" id="f-bag-h" placeholder="縦：__cm">
+      </div>
+      <input type="text" id="f-bag-d" placeholder="奥行き：__cm">
+    </div>
+    <div class="field">
+      <div class="field-label">持ち手 / ショルダー長さ</div>
+      <input type="text" id="f-bag-handle" placeholder="例：持ち手10cm / ショルダー45cm調節可">
+    </div>
+  </div>
+
+  <!-- 財布 -->
+  <div class="dyn-sec" id="sec-wallet">
+    <div class="field">
+      <div class="field-label">スタイル</div>
+      <input type="text" id="f-wallet-style" placeholder="例：長財布 / 二つ折り財布">
+    </div>
+    <div class="field">
+      <div class="field-label">サイズ</div>
+      <div class="two-col" style="margin-bottom:6px;">
+        <input type="text" id="f-wallet-w" placeholder="横：__cm">
+        <input type="text" id="f-wallet-h" placeholder="縦：__cm">
+      </div>
+      <input type="text" id="f-wallet-d" placeholder="奥行き：__cm">
+    </div>
+  </div>
+
+  <!-- アクセサリー -->
+  <div class="dyn-sec" id="sec-accessory">
+    <div class="field">
+      <div class="field-label">ジュエリー種類</div>
+      <input type="text" id="f-acc-type" placeholder="例：リング / ネックレス / ブレスレット">
+    </div>
+    <div class="field">
+      <div class="field-label">サイズ / 長さ</div>
+      <input type="text" id="f-acc-size1" placeholder="例：リングサイズ：11号" style="margin-bottom:6px;">
+      <input type="text" id="f-acc-size2" placeholder="例：ネックレス長さ：40cm">
+    </div>
+  </div>
+
+  <!-- その他 -->
+  <div class="dyn-sec" id="sec-other">
+    <div class="field">
+      <div class="field-label">アイテム種類</div>
+      <input type="text" id="f-other-type" placeholder="例：スカーフ / ベルト / サングラス">
+    </div>
+    <div class="field">
+      <div class="field-label">サイズ</div>
+      <input type="text" id="f-other-size" placeholder="例：フリーサイズ / 70cm">
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 付属品（スプレッドシートから自動取得） -->
+  <div class="field">
+    <div class="field-label">付属品</div>
+    <div class="acc-grid" id="acc-grid">
+      <button class="acc-btn" data-out="Authenticity Card" onclick="toggleAcc(this)">保証書</button>
+      <button class="acc-btn" data-out="Care Card" onclick="toggleAcc(this)">ケアカード</button>
+      <button class="acc-btn" data-out="Other Cards" onclick="toggleAcc(this)">その他カード</button>
+      <button class="acc-btn" data-out="Dust Bag" onclick="toggleAcc(this)">保存袋</button>
+      <button class="acc-btn" data-out="Box" onclick="toggleAcc(this)">箱</button>
+      <button class="acc-btn" data-out="Shoulder Strap" onclick="toggleAcc(this)">ショルダーストラップ</button>
+      <button class="acc-btn" data-out="Third-party Shoulder Strap" onclick="toggleAcc(this)">社外ストラップ</button>
+      <button class="acc-btn" data-out="Mirror" onclick="toggleAcc(this)">ミラー</button>
+    </div>
+    <div class="input-row">
+      <input type="text" id="acc-free" placeholder="その他フリーワード">
+      <button class="voice-btn btn-icon" onclick="startVoice('acc-free')">🎤</button>
+    </div>
+  </div>
+
+  <!-- コンディション -->
+  <div class="field">
+    <div class="field-label">コンディション選択</div>
+    <div class="cond-grid" id="cond-grid">
+      <button class="cond-btn" data-grade="SA" onclick="selectCond(this)">
+        <span class="cond-num">①</span><span class="cond-name">SA</span><span class="cond-sub">比較的きれい</span>
+      </button>
+      <button class="cond-btn" data-grade="A" onclick="selectCond(this)">
+        <span class="cond-num">②</span><span class="cond-name">A</span><span class="cond-sub">普通の中古</span>
+      </button>
+      <button class="cond-btn" data-grade="AB" onclick="selectCond(this)">
+        <span class="cond-num">③</span><span class="cond-name">AB</span><span class="cond-sub">使用感あり</span>
+      </button>
+      <button class="cond-btn" data-grade="B" onclick="selectCond(this)">
+        <span class="cond-num">④</span><span class="cond-name">B</span><span class="cond-sub">ダメージあり</span>
+      </button>
+      <button class="cond-btn" data-grade="BC" onclick="selectCond(this)">
+        <span class="cond-num">⑤</span><span class="cond-name">BC/C</span><span class="cond-sub">部品取り向け</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">特記事項（日本語OK）</div>
+    <div class="input-row">
+      <textarea id="f-notes-ja" placeholder="例：ハンドル付け根に薄いスレあり。内側にシミが1点あります。"></textarea>
+      <button class="voice-btn" onclick="startVoice('f-notes-ja')">🎤</button>
+    </div>
+    <div style="margin-top:6px;">
+      <button class="btn btn-secondary btn-sm" onclick="translateNotes()">🌐 英語プレビュー</button>
+    </div>
+    <div class="notes-preview" id="notes-preview"></div>
+  </div>
+
+  <div class="field" id="field-odor">
+    <div class="field-label">臭い</div>
+    <div class="input-row">
+      <input type="text" id="f-odor" placeholder="例：臭いなし（空欄の場合は「No strong odor.」で自動入力）">
+      <button class="voice-btn btn-icon" onclick="startVoice('f-odor')">🎤</button>
+    </div>
+  </div>
+</div>
+
+<!-- STEP 3: タイトル・価格 -->
+<div class="card" id="step3-card" style="display:none;">
+  <div class="card-label"><span class="step-badge">3</span> タイトル・価格</div>
+
+  <div class="field">
+    <div class="field-label">eBayタイトル（英語・80文字以内）</div>
+    <div class="title-wrap" style="margin-bottom:6px;">
+      <input type="text" id="title-input" placeholder="AIタイトル生成ボタンで自動生成できます" oninput="countTitle()">
+      <span class="char-badge" id="char-badge">0/80</span>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-secondary btn-sm" onclick="generateTitle()">✨ AIタイトル生成</button>
+      <button class="voice-btn btn-sm" style="padding:5px 10px;" onclick="startVoice('title-input')">🎤 EN</button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="field">
+    <div class="field-label">為替レート（円/ドル）</div>
+    <input type="number" id="fx-rate" value="150" oninput="calcPrice()">
+  </div>
+  <div class="two-col">
+    <div class="field">
+      <div class="field-label">eBay手数料（%・カテゴリで自動設定）</div>
+      <input type="number" id="fee-rate" value="15" readonly style="background:#f0ece8;color:var(--text-muted);">
+    </div>
+    <div class="field">
+      <div class="field-label">目標利益率（%）</div>
+      <input type="number" id="profit-rate" value="20" oninput="calcPrice()">
+    </div>
+  </div>
+
+  <div class="price-result" id="price-result">
+    <div class="price-result-label">出品提案価格</div>
+    <div class="price-result-val" id="price-val">$0.00</div>
+  </div>
+  <div style="margin-top:8px;">
+    <button class="btn btn-ghost btn-sm" onclick="applyPrice()">↑ 提案価格を販売価格に反映</button>
+  </div>
+
+  <div class="field" style="margin-top:12px;">
+    <div class="field-label">販売価格（USD）</div>
+    <input type="number" id="price-usd" placeholder="自動 or 手入力" step="0.01">
+  </div>
+</div>
+
+<!-- ステータス -->
+<div class="status" id="status"></div>
+
+<!-- 出力 -->
+<div id="output-section">
+  <div class="output-card" id="out-title-card">
+    <div class="output-head">
+      <span class="output-head-title">eBayタイトル</span>
+      <button class="copy-btn" onclick="copyEl('out-title-text')">コピー</button>
+    </div>
+    <div class="output-body"><div class="output-text" id="out-title-text"></div></div>
+  </div>
+  <div class="output-card" id="out-price-card">
+    <div class="output-head">
+      <span class="output-head-title">販売価格（USD）</span>
+      <button class="copy-btn" onclick="copyEl('out-price-text')">コピー</button>
+    </div>
+    <div class="output-body"><div class="output-text" id="out-price-text"></div></div>
+  </div>
+  <div class="output-card" id="out-desc-card">
+    <div class="output-head">
+      <span class="output-head-title">商品説明HTML</span>
+      <button class="copy-btn" onclick="copyEl('out-desc-raw')">HTMLコピー</button>
+    </div>
+    <div class="output-body">
+      <div id="out-desc-preview" style="font-size:13px;line-height:1.6;"></div>
+      <textarea id="out-desc-raw" style="display:none;"></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- 生成ボタン -->
+<div class="gen-section" id="gen-section" style="display:none;">
+  <button class="gen-btn" id="gen-btn" onclick="generate()">eBay出品データを生成する</button>
+</div>
+<div class="reset-row">
+  <button class="btn btn-ghost btn-sm" onclick="resetAll()">🔄 リセット</button>
+</div>
+
+<script>
+// ─── 設定 ──────────────────────────────────────────
+const GAS_URL    = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhyXS1KzmO9syc61ZvjSOB6d3w2mxQmqfg9OTv62TBlIUx_/exec';
+const CLAUDE_KEY = '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';
+const SHIPPING_JPY = 4000;
+
+const CAT_FEE = { bag: 15, wallet: 15, accessory: 15, other: 13.25 };
+const CAT_FEE_LABEL = { bag: 'バッグ（15%）', wallet: '財布（15%）', accessory: 'アクセサリー・ジュエリー（15%）', other: 'その他（13.25%）' };
+
+const COND_TEXT = {
+  'SA': 'Used item in fairly good condition. Minor signs of wear may be present. Please check photos for details.',
+  'A':  'Used item with minor scratches and signs of wear. Overall in relatively good condition for a pre-owned item. Please check the photos for details.',
+  'AB': 'Used item with noticeable signs of wear. Still usable, but some damage is evident. Please see photos carefully.',
+  'B':  'Used item with obvious and significant damage. The item is still usable, but the damage is clearly visible. Please review photos carefully.',
+  'BC': 'Used item with severe wear or damage. Not recommended for normal use; suitable for parts or repair.',
+};
+
+let currentCat = '';
+let currentGrade = '';
+let recognition = null;
+let suggestedPrice = null;
+let imgBase64 = '';
+let imgMime = 'image/jpeg';
+let productData = {};
+
+// ─── 管理番号から仕入値計算 ──────────────────────────
+function calcCostFromMgmt(num) {
+  if (!num || num.length < 6) return null;
+  const last2 = num.slice(-2);
+  const reversed = last2.split('').reverse().join('');
+  const val = parseInt(reversed, 10);
+  if (isNaN(val) || val === 0) return null;
+  return Math.round((val * 1000) / 1.1);
+}
+
+// ─── 商品検索 ─────────────────────────────────────
+async function fetchProduct() {
+  const num = document.getElementById('mgmt-num').value.trim();
+  if (!num || num.length < 4) { showStatus('管理番号を入力してください', 'error'); return; }
+  showStatus('スプレッドシートから取得中...', 'loading');
+  try {
+    const res = await fetch(`${GAS_URL}?id=${encodeURIComponent(num)}&fullId=${encodeURIComponent(num)}`);
+    const d = await res.json();
+    if (d && d.name) {
+      productData = d;
+      renderInfoCard(d, num);
+      hideStatus();
+    } else {
+      showStatus('商品が見つかりませんでした', 'error');
+    }
+  } catch(e) {
+    showStatus('GAS接続中（no-cors環境）', 'success');
+    setTimeout(hideStatus, 1500);
+  }
+  checkAnalyzeReady();
+}
+
+function renderInfoCard(d, num) {
+  document.getElementById('info-name').textContent = d.name || '—';
+  const tags = document.getElementById('info-tags');
+  tags.innerHTML = '';
+  if (d.rank)     tags.innerHTML += `<span class="info-tag">ランク <b>${d.rank}</b></span>`;
+  if (d.sizeData) tags.innerHTML += `<span class="info-tag">採寸 <b>${d.sizeData}</b></span>`;
+  if (d.price)    tags.innerHTML += `<span class="info-tag">出品価格 <b>¥${Number(d.price).toLocaleString()}</b></span>`;
+
+  // フォルダボタン
+  const area = document.getElementById('folder-btn-area');
+  area.innerHTML = '';
+  if (d.folderUrl) {
+    area.innerHTML += `<a href="${d.folderUrl}" target="_blank" class="btn btn-ghost btn-sm" style="text-decoration:none;">📁 画像を開く</a>`;
+    area.innerHTML += `<button class="btn btn-ghost btn-sm" onclick="downloadImages('${d.folderUrl}')">⬇️ 一括DL</button>`;
+  }
+  document.getElementById('info-card').classList.add('visible');
+}
+
+function checkAnalyzeReady() {
+  const hasNum = document.getElementById('mgmt-num').value.trim().length >= 4;
+  const hasImg = imgBase64.length > 0;
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = !(hasNum && hasImg);
+  btn.textContent = hasNum && !hasImg ? '🔍 AI解析開始（画像を追加してください）' : '🔍 AI解析開始';
+}
+
+// ─── 画像処理 ────────────────────────────────────
+function handleImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  imgMime = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    imgBase64 = e.target.result.split(',')[1];
+    const prev = document.getElementById('img-preview');
+    prev.src = e.target.result;
+    prev.classList.add('visible');
+    document.getElementById('upload-area').classList.add('has-img');
+    document.getElementById('upload-hint').textContent = '✓ 画像選択済み';
+    checkAnalyzeReady();
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─── AI解析 ──────────────────────────────────────
+async function analyzeProduct() {
+  const num  = document.getElementById('mgmt-num').value.trim();
+  const name = productData.name || '';
+  const rank = productData.rank || '';
+  const size = productData.sizeData || '';
+  const cond = productData.condNote || '';
+  const acc  = productData.accData || '';
+
+  showStatus('AI解析中...（商品名・画像から情報を推測しています）', 'loading');
+  document.getElementById('analyze-btn').disabled = true;
+
+  const textPrompt = `以下の情報から商品情報を推測して、JSON形式で返してください。
+
+自社商品名：${name}
+採寸データ：${size}
+
+出力するJSONのキーと説明：
+- category: "bag"(バッグ) / "wallet"(財布) / "accessory"(アクセサリー) / "other"(その他) のいずれか
+- brand: ブランド名（日本語）
+- material: 素材（日本語）
+- color: カラー（日本語）
+- style: スタイル（日本語、バッグなら「トートバッグ」など、アクセサリーなら「リング」など）
+- size_w: 横幅（cm表記、不明なら""）
+- size_h: 縦（cm表記、不明なら""）
+- size_d: 奥行き（cm表記、不明なら""）
+- handle: 持ち手・ショルダー長さ（日本語、不明なら""）
+
+JSONのみ返してください。説明不要。`;
+
+  try {
+    const messages = [];
+    if (imgBase64) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: imgMime, data: imgBase64 } },
+          { type: 'text', text: textPrompt }
+        ]
+      });
+    } else {
+      messages.push({ role: 'user', content: textPrompt });
+    }
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, messages })
+    });
+    const data = await res.json();
+    const raw = data.content[0].text.trim().replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
+    applyAnalysis(parsed, rank, cond, acc, size, num);
+    hideStatus();
+  } catch(e) {
+    showStatus('解析エラー: ' + e.message, 'error');
+    document.getElementById('analyze-btn').disabled = false;
+  }
+}
+
+function applyAnalysis(p, rank, cond, acc, size, num) {
+  // カテゴリ自動選択
+  const catBtn = document.querySelector(`.cat-btn[data-cat="${p.category}"]`);
+  if (catBtn) selectCat(catBtn);
+
+  // フィールド自動入力
+  setVal('f-brand',    p.brand || '');
+  setVal('f-material', p.material || '');
+  setVal('f-color',    p.color || '');
+
+  if (p.category === 'bag') {
+    setVal('f-bag-style',  p.style || '');
+    setVal('f-bag-w',      p.size_w || '');
+    setVal('f-bag-h',      p.size_h || '');
+    setVal('f-bag-d',      p.size_d || '');
+    setVal('f-bag-handle', p.handle || '');
+  } else if (p.category === 'wallet') {
+    setVal('f-wallet-style', p.style || '');
+    setVal('f-wallet-w',     p.size_w || '');
+    setVal('f-wallet-h',     p.size_h || '');
+    setVal('f-wallet-d',     p.size_d || '');
+  } else if (p.category === 'accessory') {
+    setVal('f-acc-type',  p.style || '');
+  } else {
+    setVal('f-other-type', p.style || '');
+  }
+
+  // ランク → コンディション自動選択
+  if (rank) {
+    const grade = rankToGrade(rank);
+    const btn = document.querySelector(`.cond-btn[data-grade="${grade}"]`);
+    if (btn) selectCond(btn);
+  }
+
+  // 状態特記事項
+  if (cond) setVal('f-notes-ja', cond);
+
+  // 付属品
+  if (acc) restoreAcc(acc);
+
+  // 仕入れ値から価格計算
+  const cost = calcCostFromMgmt(num);
+  if (cost) calcPrice(cost);
+
+  // STEP2・3表示
+  document.getElementById('step2-card').style.display = 'block';
+  document.getElementById('step3-card').style.display = 'block';
+  document.getElementById('gen-section').style.display = 'block';
+  document.getElementById('step2-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ランク文字列からグレードに変換
+function rankToGrade(rank) {
+  const r = rank.toUpperCase().trim();
+  if (r === 'S' || r === 'SA') return 'SA';
+  if (r === 'A') return 'A';
+  if (r.startsWith('AB')) return 'AB';
+  if (r.startsWith('B') && !r.startsWith('BC')) return 'B';
+  if (r === 'BC' || r === 'C') return 'BC';
+  return 'A';
+}
+
+// ─── カテゴリ選択 ─────────────────────────────────
+function selectCat(btn) {
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentCat = btn.dataset.cat;
+  ['bag','wallet','accessory','other'].forEach(c => {
+    document.getElementById('sec-' + c).classList.toggle('visible', c === currentCat);
+  });
+  document.getElementById('field-odor').style.display = currentCat === 'accessory' ? 'none' : 'block';
+  // 手数料自動設定
+  const fee = CAT_FEE[currentCat] || 15;
+  document.getElementById('fee-rate').value = fee;
+  document.getElementById('fee-display').textContent = `手数料率：${CAT_FEE_LABEL[currentCat] || ''}（自動設定）`;
+  calcPrice();
+}
+
+// ─── コンディション ───────────────────────────────
+function selectCond(btn) {
+  document.querySelectorAll('.cond-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentGrade = btn.dataset.grade;
+  document.getElementById('notes-preview').style.display = 'none';
+}
+
+// ─── 特記事項翻訳 ────────────────────────────────
+async function translateNotes() {
+  const ja = document.getElementById('f-notes-ja').value.trim();
+  if (!ja) { showStatus('特記事項を入力してください', 'error'); return; }
+  showStatus('英語に変換中...', 'loading');
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514', max_tokens: 300,
+        messages: [{ role: 'user', content: `Translate the following Japanese condition notes for a luxury secondhand item into concise, natural English for an eBay listing. Return ONLY the translated text.\n\n${ja}` }]
+      })
+    });
+    const data = await res.json();
+    const translated = data.content[0].text.trim();
+    const prev = document.getElementById('notes-preview');
+    prev.textContent = translated;
+    prev.style.display = 'block';
+    hideStatus();
+  } catch(e) { showStatus('翻訳エラー: ' + e.message, 'error'); }
+}
+
+// 特記事項を先頭に組み込んだConditionテキスト生成
+function buildConditionText() {
+  const base  = COND_TEXT[currentGrade] || 'Used condition. Please check photos for details.';
+  const prev  = document.getElementById('notes-preview');
+  const extra = (prev.style.display !== 'none') ? prev.textContent.trim() : '';
+  if (!extra) return base;
+  // 特記事項を冒頭に組み込む
+  return `${extra} ${base}`;
+}
+
+// ─── 付属品 ───────────────────────────────────────
+function toggleAcc(btn) { btn.classList.toggle('on'); }
+
+function restoreAcc(str) {
+  if (!str) return;
+  document.querySelectorAll('.acc-btn').forEach(b => {
+    if (str.includes(b.dataset.out) || str.includes(b.textContent.trim())) b.classList.add('on');
+  });
+}
+
+function getAccText() {
+  const selected = Array.from(document.querySelectorAll('.acc-btn.on')).map(b => b.dataset.out);
+  const free = document.getElementById('acc-free').value.trim();
+  if (free) selected.push(free);
+  if (!selected.length) return 'No item box or dust bag. Only accessories shown in photos.';
+  return selected.join(', ') + '.';
+}
+
+// ─── 価格計算 ─────────────────────────────────────
+function calcPrice(costOverride) {
+  const num  = document.getElementById('mgmt-num').value.trim();
+  const cost = costOverride || calcCostFromMgmt(num) || 0;
+  const fx   = parseFloat(document.getElementById('fx-rate').value)     || 150;
+  const fee  = parseFloat(document.getElementById('fee-rate').value)    || 15;
+  const prof = parseFloat(document.getElementById('profit-rate').value) || 20;
+  if (!cost) { document.getElementById('price-result').classList.remove('visible'); return; }
+  const totalJpy = (cost + SHIPPING_JPY) / (1 - (fee + prof) / 100);
+  const usd = totalJpy / fx;
+  suggestedPrice = Math.floor(usd) + 0.99;
+  document.getElementById('price-val').textContent = `$${suggestedPrice.toFixed(2)}`;
+  document.getElementById('price-result').classList.add('visible');
+}
+
+function applyPrice() {
+  if (suggestedPrice) document.getElementById('price-usd').value = suggestedPrice.toFixed(2);
+}
+
+// ─── タイトル ─────────────────────────────────────
+function countTitle() {
+  const val = document.getElementById('title-input').value;
+  const len = val.length;
+  const badge = document.getElementById('char-badge');
+  badge.textContent = `${len}/80`;
+  badge.className = 'char-badge' + (len > 80 ? ' over' : len >= 60 ? ' good' : '');
+}
+
+async function generateTitle() {
+  const brand = document.getElementById('f-brand').value;
+  const mat   = document.getElementById('f-material').value;
+  const color = document.getElementById('f-color').value;
+  const cat   = currentCat;
+  const style = cat === 'bag' ? document.getElementById('f-bag-style').value
+              : cat === 'wallet' ? document.getElementById('f-wallet-style').value
+              : cat === 'accessory' ? document.getElementById('f-acc-type').value
+              : document.getElementById('f-other-type').value;
+  const name  = document.getElementById('info-name').textContent;
+
+  showStatus('AIタイトル生成中...', 'loading');
+
+  const prompt = `You are an eBay listing title expert for Japanese luxury secondhand goods.
+
+Create an eBay title based on:
+- Product name: ${name}
+- Brand: ${brand}
+- Material: ${mat}
+- Color: ${color}
+- Style/Type: ${style}
+- Category: ${cat}
+
+Rules (STRICTLY enforce all):
+- Maximum 80 characters including spaces — count carefully, never exceed
+- Ideal range: 70–80 characters
+- English only
+- Brand name first
+- End with "Auth" (use "Auth" instead of "Authentic" to save characters)
+- Do NOT use hyphens
+- Do NOT use the word "Old"
+- No comments or explanations — return ONLY the title text`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
+    });
+    const data = await res.json();
+    let t = data.content[0].text.trim().replace(/^["']|["']$/g, '');
+    if (t.length > 80) t = t.slice(0, 80).trim();
+    document.getElementById('title-input').value = t;
+    countTitle();
+    hideStatus();
+  } catch(e) { showStatus('AIエラー: ' + e.message, 'error'); }
+}
+
+// ─── 生成 ─────────────────────────────────────────
+function generate() {
+  const title = document.getElementById('title-input').value.trim();
+  const price = document.getElementById('price-usd').value.trim();
+  const mgmt  = document.getElementById('mgmt-num').value.trim();
+
+  if (!currentCat)      { showStatus('カテゴリを選択してください', 'error'); return; }
+  if (!title)           { showStatus('タイトルを入力してください', 'error'); return; }
+  if (title.length > 80){ showStatus('タイトルが80文字を超えています', 'error'); return; }
+  if (!currentGrade)    { showStatus('コンディションを選択してください', 'error'); return; }
+  if (!price)           { showStatus('販売価格を入力してください', 'error'); return; }
+
+  const html = buildHTML(title, mgmt, price);
+
+  showEl('out-title-card'); document.getElementById('out-title-text').textContent = title;
+  showEl('out-price-card'); document.getElementById('out-price-text').textContent = `$${parseFloat(price).toFixed(2)}`;
+  showEl('out-desc-card');
+  document.getElementById('out-desc-preview').innerHTML = html;
+  document.getElementById('out-desc-raw').value = html;
+
+  showStatus('✓ 生成完了', 'success');
+  setTimeout(hideStatus, 2000);
+  document.getElementById('out-title-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ─── HTMLビルド ───────────────────────────────────
+function buildHTML(title, mgmt, price) {
+  const brand    = document.getElementById('f-brand').value.trim();
+  const material = document.getElementById('f-material').value.trim();
+  const color    = document.getElementById('f-color').value.trim();
+  const odorRaw  = document.getElementById('f-odor').value.trim();
+  const odor     = odorRaw || 'No strong odor.';
+  const others   = '';
+  const accText  = getAccText();
+  const cond     = buildConditionText();
+
+  // カテゴリ別 → 英語変換
+  let dynRows = '';
+  if (currentCat === 'bag') {
+    const style  = document.getElementById('f-bag-style').value.trim();
+    const w      = toEnSize(document.getElementById('f-bag-w').value.trim());
+    const h      = toEnSize(document.getElementById('f-bag-h').value.trim());
+    const d      = toEnSize(document.getElementById('f-bag-d').value.trim());
+    const handle = toEnHandle(document.getElementById('f-bag-handle').value.trim());
+    if (style)   dynRows += row('Style', jaToEnStyle(style));
+    if (w||h||d) {
+      const sv = [w?`Width: ${w}`:'', h?`Height: ${h}`:'', d?`Depth: ${d}`:''].filter(Boolean).join('<br>');
+      dynRows += row('Size', sv, true);
+    }
+    if (handle)  dynRows += row('Handle Drop / Shoulder Length', handle);
+    dynRows += row('Accessories', accText);
+    dynRows += row('Condition', cond);
+    dynRows += row('Odor', odor);
+  } else if (currentCat === 'wallet') {
+    const style = document.getElementById('f-wallet-style').value.trim();
+    const w     = toEnSize(document.getElementById('f-wallet-w').value.trim());
+    const h     = toEnSize(document.getElementById('f-wallet-h').value.trim());
+    const d     = toEnSize(document.getElementById('f-wallet-d').value.trim());
+    if (style)   dynRows += row('Style', jaToEnStyle(style));
+    if (w||h||d) {
+      const sv = [w?`Width: ${w}`:'', h?`Height: ${h}`:'', d?`Depth: ${d}`:''].filter(Boolean).join('<br>');
+      dynRows += row('Size', sv, true);
+    }
+    dynRows += row('Accessories', accText);
+    dynRows += row('Condition', cond);
+    dynRows += row('Odor', odor);
+  } else if (currentCat === 'accessory') {
+    const type  = document.getElementById('f-acc-type').value.trim();
+    const s1    = document.getElementById('f-acc-size1').value.trim();
+    const s2    = document.getElementById('f-acc-size2').value.trim();
+    if (type) dynRows += row('Jewelry Type', jaToEnStyle(type));
+    if (s1||s2) {
+      const sv = [s1, s2].filter(Boolean).join('<br>');
+      dynRows += row('Size / Length', sv, true);
+    }
+    dynRows += row('Accessories', accText);
+    dynRows += row('Condition', cond);
+  } else {
+    const type = document.getElementById('f-other-type').value.trim();
+    const size = document.getElementById('f-other-size').value.trim();
+    if (type) dynRows += row('Item Type', jaToEnStyle(type));
+    if (size) dynRows += row('Size', size);
+    dynRows += row('Accessories', accText);
+    dynRows += row('Condition', cond);
+    dynRows += row('Odor', odor);
+  }
+
+  const allRows = `
+    ${row('Management Number', mgmt || '—')}
+    ${row('Brand', jaToEnBrand(brand) || '—')}
+    ${row('Material', jaToEnMaterial(material) || '—')}
+    ${row('Color', jaToEnColor(color) || '—')}
+    ${dynRows}
+  `;
+
+  const noticeExtra = currentCat !== 'accessory'
+    ? '<p>Accessories are provided as a complimentary service. Returns will not be accepted due to the condition of the accessories.</p>' : '';
+
+  return `<div style="max-width:900px;margin:auto;font-family:Arial,Helvetica,sans-serif;color:#444;line-height:1.6;background:#ffffff;">
+
+<div style="font-size:28px;font-weight:bold;color:#7a1f2b;border-bottom:3px solid #7a1f2b;padding-bottom:10px;margin-bottom:20px;">${escHtml(title)}</div>
+
+<div style="background:#7a1f2b;color:#ffffff;padding:10px 15px;font-weight:bold;margin-top:20px;">Item Description</div>
+<table style="width:100%;border-collapse:collapse;"><tbody>${allRows}</tbody></table>
+
+${sec('Important Notice', `<p>If you have any questions about the condition of the item, please be sure to ask before purchasing.</p>
+<p>Combined shipping is available for multiple purchases. If you would like to purchase several items together, please contact us before payment.</p>
+<p>Please note that the ruler shown in the photos is for size reference and is not included with the item.</p>
+<p>The color of the item may appear slightly different from the photos due to lighting conditions or screen settings.</p>
+${noticeExtra}
+<p>Thank you for your understanding. If you are satisfied with our service, we would greatly appreciate your positive feedback and a 5-star rating.</p>`)}
+
+${sec('Purchase Source', `<p>Our items are sourced from reputable suppliers in Japan, including AACD member stores, brand auctions with professional authentication checks, and licensed secondhand dealers.</p>`)}
+
+${sec('Returns', `<p>Returns are accepted if the item is not as described. In this case, we will cover the return shipping cost.</p>
+<p>Returns due to buyer preference are also accepted, but the return shipping cost will be the buyer's responsibility.</p>
+<p>Partial refunds are not available.</p>
+<p>Returns or partial refund requests will not be accepted for scratches, damage, or other conditions shown in the photos.</p>
+<p>Please review all photos and descriptions carefully before purchasing.</p>`)}
+
+${sec('Authentic Guarantee', `<p><strong>All items are guaranteed to be 100% authentic.</strong></p>
+<p>Our items are inspected by professional brand experts.</p>
+<p>Please purchase with confidence.</p>`)}
+
+${sec('Shipping', `<p>This item will be shipped via FedEx or another international shipping service.</p>
+<p>Shipping is available only to the address registered with eBay. If you would like the item shipped to a different address, please update your address on eBay before placing your order.</p>
+<p>Items will be shipped within 7–10 business days after purchase.</p>
+<p>Please note: It may take 24–48 hours for the tracking number to be updated in the system.</p>`)}
+
+${sec('International Buyers - Please Note', `<p>Import duties, taxes, and other charges are not included in the item price or shipping cost.</p>
+<p>These charges are the buyer's responsibility.</p>
+<p>Please check with your country's customs office to determine what these additional costs may be before purchasing.</p>`)}
+
+${sec('About Us', `<p>Thank you for visiting our store. We deliver pre-owned luxury items from Japan to customers around the world. Each piece is carefully selected for its quality, value, and uniqueness.</p>
+<p>All items are carefully inspected before shipment to ensure authenticity and quality. If you are looking for a specific item that is not currently listed, please feel free to contact us. We may be able to help locate it for you through our trusted sourcing network.</p>
+<p>We strive to provide courteous and responsive service so that you can shop with confidence.</p>
+<p>We are a licensed business approved by the Osaka Prefectural Public Safety Commission.<br>Secondhand Dealer License Number: 62230R056505</p>`)}
+
+</div>`;
+}
+
+function row(label, val, raw=false) {
+  const v = raw ? val : escHtml(val);
+  return `<tr><td style="background:#e9e2da;color:#5a4a42;padding:8px;font-weight:bold;vertical-align:top;">${escHtml(label)}</td><td style="background:#faf8f5;padding:8px;">${v}</td></tr>`;
+}
+function sec(title, body) {
+  return `<div style="background:#7a1f2b;color:#ffffff;padding:10px 15px;font-weight:bold;margin-top:30px;">${title}</div><div style="background:#faf8f5;padding:15px;">${body}</div>`;
+}
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ─── 日本語→英語変換ヘルパー ────────────────────────
+function jaToEnBrand(s) {
+  const map = { 'グッチ':'GUCCI','ルイヴィトン':'LOUIS VUITTON','シャネル':'CHANEL','プラダ':'PRADA','セリーヌ':'CELINE','ロエベ':'LOEWE','エルメス':'HERMES','ティファニー':'TIFFANY & CO.','カルティエ':'CARTIER','ブルガリ':'BVLGARI','コーチ':'COACH','バレンシアガ':'BALENCIAGA','ボッテガヴェネタ':'BOTTEGA VENETA','フェンディ':'FENDI','バーバリー':'BURBERRY','ディオール':'DIOR','サンローラン':'SAINT LAURENT','ジバンシー':'GIVENCHY','ヴァレンティノ':'VALENTINO','ジミーチュウ':'JIMMY CHOO' };
+  return map[s] || s;
+}
+function jaToEnMaterial(s) {
+  const map = { 'レザー':'Leather','キャンバス':'Canvas','ナイロン':'Nylon','スエード':'Suede','PVC':'PVC','エナメル':'Patent Leather','クロコ':'Crocodile','ゴールド':'Gold','シルバー':'Silver','プラチナ':'Platinum' };
+  for (const [k,v] of Object.entries(map)) { if (s.includes(k)) s = s.replace(k, v); }
+  return s;
+}
+function jaToEnColor(s) {
+  const map = { '黒':'Black','ブラック':'Black','白':'White','ホワイト':'White','茶':'Brown','ブラウン':'Brown','ベージュ':'Beige','赤':'Red','レッド':'Red','ピンク':'Pink','青':'Blue','ブルー':'Blue','紺':'Navy','グレー':'Gray','グリーン':'Green','緑':'Green','オレンジ':'Orange','パープル':'Purple','紫':'Purple','ゴールド':'Gold','シルバー':'Silver','マルチ':'Multicolor' };
+  return map[s] || s;
+}
+function jaToEnStyle(s) {
+  const map = { 'トートバッグ':'Tote Bag','ショルダーバッグ':'Shoulder Bag','ハンドバッグ':'Handbag','クラッチ':'Clutch','リュック':'Backpack','バックパック':'Backpack','ポーチ':'Pouch','長財布':'Long Wallet','二つ折り財布':'Bifold Wallet','コインケース':'Coin Purse','リング':'Ring','ネックレス':'Necklace','ブレスレット':'Bracelet','イヤリング':'Earrings','ピアス':'Earrings','ブローチ':'Brooch','スカーフ':'Scarf','ベルト':'Belt','時計':'Watch','サングラス':'Sunglasses' };
+  return map[s] || s;
+}
+
+// cmをインチ変換してフォーマット
+function toEnSize(val) {
+  if (!val) return '';
+  const m = val.match(/([\d.]+)/);
+  if (!m) return val;
+  const cm = parseFloat(m[1]);
+  const inch = (cm / 2.54).toFixed(1);
+  return `${inch} in (${cm} cm)`;
+}
+function toEnHandle(val) {
+  if (!val) return '';
+  return val.replace(/(\d+(\.\d+)?)cm/g, (_, n) => {
+    const inch = (parseFloat(n) / 2.54).toFixed(1);
+    return `${inch} in (${n} cm)`;
+  });
+}
+
+// ─── 画像一括ダウンロード ────────────────────────────
+const DRIVE_CLIENT_ID = '24568286649-p64c441e8mrgutb8p81e7it3jg2u8v7e.apps.googleusercontent.com';
+const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+let driveAccessToken = null;
+
+async function getAccessToken() {
+  return new Promise((resolve, reject) => {
+    if (driveAccessToken) { resolve(driveAccessToken); return; }
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: DRIVE_CLIENT_ID,
+      scope: DRIVE_SCOPES,
+      callback: (response) => {
+        if (response.error) { reject(response.error); return; }
+        driveAccessToken = response.access_token;
+        resolve(driveAccessToken);
+      }
+    });
+    client.requestAccessToken();
+  });
+}
+
+async function downloadImages(folderUrl) {
+  const match = folderUrl.match(/folders\/([a-zA-Z0-9_-]+)/);
+  if (!match) { showStatus('フォルダURLが不正です', 'error'); return; }
+  const folderId = match[1];
+  showStatus('Googleログイン中...', 'loading');
+  try {
+    const token = await getAccessToken();
+    showStatus('画像一覧を取得中...', 'loading');
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const data = await res.json();
+    const files = (data.files || []).filter(f => f.mimeType.startsWith('image/'));
+    if (files.length === 0) { showStatus('画像が見つかりませんでした', 'error'); return; }
+    showStatus(`${files.length}枚をダウンロード中...`, 'loading');
+    for (const file of files) {
+      const imgRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const blob = await imgRes.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(url);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    showStatus(`✓ ${files.length}枚のダウンロード完了！`, 'success');
+    setTimeout(hideStatus, 3000);
+  } catch(err) {
+    showStatus('ダウンロードエラー：' + err.message, 'error');
+  }
+}
+
+// ─── 音声入力 ─────────────────────────────────────
+function startVoice(targetId) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert('Chrome専用機能です'); return; }
+  if (recognition) { recognition.stop(); recognition = null; return; }
+  recognition = new SR();
+  recognition.lang = targetId === 'title-input' ? 'en-US' : 'ja-JP';
+  recognition.continuous = false;
+  const btn = document.querySelector(`[onclick="startVoice('${targetId}')"]`);
+  if (btn) btn.classList.add('recording');
+  recognition.onresult = e => {
+    const el = document.getElementById(targetId);
+    el.value += (el.value ? '　' : '') + e.results[0][0].transcript;
+    if (targetId === 'title-input') countTitle();
+  };
+  recognition.onend = () => {
+    if (btn) btn.classList.remove('recording');
+    recognition = null;
+  };
+  recognition.start();
+}
+
+// ─── コピー ───────────────────────────────────────
+function copyEl(id) {
+  const el = document.getElementById(id);
+  const text = el.tagName === 'TEXTAREA' ? el.value : el.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showStatus('コピーしました ✓', 'success');
+    setTimeout(hideStatus, 1500);
+  });
+}
+
+// ─── リセット ─────────────────────────────────────
+function resetAll() {
+  if (!confirm('入力内容をリセットしますか？')) return;
+  const ids = ['mgmt-num','f-brand','f-material','f-color','f-bag-style','f-bag-w','f-bag-h','f-bag-d','f-bag-handle',
+    'f-wallet-style','f-wallet-w','f-wallet-h','f-wallet-d','f-acc-type','f-acc-size1','f-acc-size2',
+    'f-other-type','f-other-size','f-notes-ja','f-odor','acc-free','title-input','price-usd',
+    'fx-rate','fee-rate','profit-rate'];
+  ids.forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('fx-rate').value = '150';
+  document.getElementById('fee-rate').value = '15';
+  document.getElementById('profit-rate').value = '20';
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.cond-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.acc-btn').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.dyn-sec').forEach(s => s.classList.remove('visible'));
+  document.getElementById('info-card').classList.remove('visible');
+  document.getElementById('price-result').classList.remove('visible');
+  document.getElementById('notes-preview').style.display = 'none';
+  document.getElementById('notes-preview').textContent = '';
+  document.getElementById('img-preview').classList.remove('visible');
+  document.getElementById('upload-area').classList.remove('has-img');
+  document.getElementById('upload-hint').textContent = '📷 タップして画像を選択';
+  document.getElementById('step2-card').style.display = 'none';
+  document.getElementById('step3-card').style.display = 'none';
+  document.getElementById('gen-section').style.display = 'none';
+  ['out-title-card','out-price-card','out-desc-card'].forEach(id => document.getElementById(id).classList.remove('visible'));
+  document.getElementById('fee-display').textContent = '';
+  currentCat = ''; currentGrade = ''; suggestedPrice = null; imgBase64 = ''; productData = {};
+  hideStatus(); countTitle();
+  document.getElementById('analyze-btn').disabled = true;
+}
+
+// ─── ユーティリティ ───────────────────────────────
+function setVal(id, v) { const el = document.getElementById(id); if(el) el.value = v; }
+function showStatus(msg, type) { const el = document.getElementById('status'); el.textContent = msg; el.className = `status show ${type}`; }
+function hideStatus() { document.getElementById('status').className = 'status'; }
+function showEl(id) { document.getElementById(id).classList.add('visible'); }
+
+countTitle();
+</script>
+</body>
+</html>
