@@ -795,9 +795,27 @@ function restoreAcc(str) {
 function getAccText() {
   const selected = Array.from(document.querySelectorAll('.acc-btn.on')).map(b => b.dataset.out);
   const free = document.getElementById('acc-free').value.trim();
-  if (free) selected.push(free);
+  if (free) {
+    // フリーワードの日本語→英語変換
+    const freeEn = jaToEnAcc(free);
+    selected.push(freeEn);
+  }
   if (!selected.length) return 'No item box or dust bag. Only accessories shown in photos.';
   return selected.join(', ') + '.';
+}
+
+function jaToEnAcc(s) {
+  const map = {
+    'リボン':'Ribbon','チャーム':'Charm','鍵':'Key','南京錠':'Padlock','ロック':'Lock',
+    'ベルト':'Belt','ポーチ':'Pouch','コイン':'Coin Purse','カード':'Card','タグ':'Tag',
+    'クリップ':'Clip','ブラシ':'Brush','クロス':'Cleaning Cloth','袋':'Bag',
+    '巾着':'Drawstring Bag','ハンガー':'Hanger','ケース':'Case','保証書':'Warranty Card',
+    '説明書':'Manual','領収書':'Receipt'
+  };
+  for (const [k, v] of Object.entries(map)) {
+    if (s.includes(k)) s = s.replace(k, v);
+  }
+  return s;
 }
 
 // ─── 価格計算 ─────────────────────────────────────
@@ -955,7 +973,7 @@ function buildHTML(title, mgmt, price, condText) {
   const material = document.getElementById('f-material').value.trim();
   const color    = document.getElementById('f-color').value.trim();
   const odorRaw  = document.getElementById('f-odor').value.trim();
-  const odor     = odorRaw || 'No strong odor.';
+  const odor     = odorRaw ? jaToEnOdor(odorRaw) : 'No strong odor.';
   const others   = '';
   const accText  = getAccText();
   const cond     = condText || 'Used condition. Please check photos for details.';
@@ -1088,6 +1106,25 @@ function jaToEnColor(s) {
   const map = { '黒':'Black','ブラック':'Black','白':'White','ホワイト':'White','茶':'Brown','ブラウン':'Brown','ベージュ':'Beige','赤':'Red','レッド':'Red','ピンク':'Pink','青':'Blue','ブルー':'Blue','紺':'Navy','グレー':'Gray','グリーン':'Green','緑':'Green','オレンジ':'Orange','パープル':'Purple','紫':'Purple','ゴールド':'Gold','シルバー':'Silver','マルチ':'Multicolor' };
   return map[s] || s;
 }
+function jaToEnOdor(s) {
+  const map = {
+    'におい有':'Some odor present.',
+    'においあり':'Some odor present.',
+    '臭いあり':'Some odor present.',
+    '臭い有':'Some odor present.',
+    'タバコ臭':'Slight tobacco smell.',
+    'カビ臭':'Slight musty smell.',
+    'においなし':'No strong odor.',
+    'においなし。':'No strong odor.',
+    'なし':'No strong odor.',
+  };
+  for (const [k, v] of Object.entries(map)) {
+    if (s.includes(k)) return v;
+  }
+  // 日本語が残っている場合はそのまま返す（後でAI翻訳で対応）
+  return s;
+}
+
 function jaToEnStyle(s) {
   const map = { 'トートバッグ':'Tote Bag','ショルダーバッグ':'Shoulder Bag','ハンドバッグ':'Handbag','クラッチ':'Clutch','リュック':'Backpack','バックパック':'Backpack','ポーチ':'Pouch','ミニバッグ':'Mini Bag','クロスボディ':'Crossbody Bag','ボストンバッグ':'Boston Bag','長財布':'Long Wallet','二つ折り財布':'Bifold Wallet','三つ折り財布':'Trifold Wallet','コインケース':'Coin Purse','カードケース':'Card Case','リング':'Ring','ネックレス':'Necklace','ブレスレット':'Bracelet','イヤリング':'Earrings','ピアス':'Earrings','ブローチ':'Brooch','スカーフ':'Scarf','ベルト':'Belt','時計':'Watch','サングラス':'Sunglasses' };
   // スペース・全角スペース区切りで複数ワード対応
@@ -1105,10 +1142,23 @@ function toEnSize(val) {
 }
 function toEnHandle(val) {
   if (!val) return '';
-  return val.replace(/(\d+(\.\d+)?)cm/g, (_, n) => {
+  // 日本語ラベルを英語に変換
+  val = val
+    .replace(/ハンドル高さ|持ち手/g, 'Handle Drop')
+    .replace(/ショルダー全長|ショルダー長さ|ショルダー/g, 'Shoulder Length')
+    .replace(/最長/g, 'up to')
+    .replace(/調節可|調節可能/g, 'adjustable');
+  // cm→インチ変換
+  val = val.replace(/([\d.]+)cm/g, (_, n) => {
     const inch = (parseFloat(n) / 2.54).toFixed(1);
     return `${inch} in (${n} cm)`;
   });
+  // センチ表記も変換
+  val = val.replace(/([\d.]+)センチ/g, (_, n) => {
+    const inch = (parseFloat(n) / 2.54).toFixed(1);
+    return `${inch} in (${n} cm)`;
+  });
+  return val;
 }
 
 // ─── 画像一括ダウンロード ────────────────────────────
