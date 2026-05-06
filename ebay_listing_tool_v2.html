@@ -619,11 +619,13 @@ JSONのみ返してください。説明不要。`;
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true'
       },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, messages })
+      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 500, messages })
     });
     const data = await res.json();
+    if (!data.content || !data.content[0]) throw new Error('APIレスポンスが不正です: ' + JSON.stringify(data));
     const raw = data.content[0].text.trim().replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(raw);
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch(je) { throw new Error('JSON解析失敗: ' + raw.slice(0,100)); }
     applyAnalysis(parsed, rank, cond, acc, size, num);
     hideStatus();
   } catch(e) {
@@ -728,7 +730,7 @@ async function translateNotes() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514', max_tokens: 300,
+        model: 'claude-sonnet-4-5', max_tokens: 300,
         messages: [{ role: 'user', content: `Translate the following Japanese condition notes for a luxury secondhand item into concise, natural English for an eBay listing. Return ONLY the translated text.\n\n${ja}` }]
       })
     });
@@ -834,7 +836,7 @@ Rules (STRICTLY enforce all):
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
     });
     const data = await res.json();
     let t = data.content[0].text.trim().replace(/^["']|["']$/g, '');
