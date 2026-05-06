@@ -432,6 +432,24 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
 
 <!-- 出力 -->
 <div id="output-section">
+  <!-- 作業者・保存 -->
+  <div class="output-card" id="out-worker-card">
+    <div class="output-head">
+      <span class="output-head-title">出品実績の保存</span>
+    </div>
+    <div class="output-body">
+      <div class="field-label" style="margin-bottom:6px;">作業者を選択してください</div>
+      <select id="worker-select" onchange="checkSaveBtn()" style="width:100%;font-family:inherit;font-size:13px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);color:var(--text);margin-bottom:12px;">
+        <option value="">選択してください</option>
+      </select>
+      <button id="save-btn" onclick="saveAndReset()" disabled
+        style="width:100%;padding:13px;background:#2d7a4a;color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;transition:opacity .2s;opacity:.4;">
+        出品実績を保存してリセット
+      </button>
+      <div id="save-status" style="margin-top:8px;font-family:'DM Mono',monospace;font-size:11px;"></div>
+    </div>
+  </div>
+
   <div class="output-card" id="out-title-card">
     <div class="output-head">
       <span class="output-head-title">eBayタイトル</span>
@@ -469,7 +487,6 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
 <script>
 // ─── 設定 ──────────────────────────────────────────
 const GAS_URL    = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhyXS1KzmO9syc61ZvjSOB6d3w2mxQmqfg9OTv62TBlIUx_/exec';
-const CLAUDE_KEY = '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';
 const SHIPPING_JPY = 4000;
 
 const CAT_FEE = { bag: 15, wallet: 15, accessory: 15, other: 13.25 };
@@ -611,21 +628,18 @@ JSONのみ返してください。説明不要。`;
       messages.push({ role: 'user', content: textPrompt });
     }
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': CLAUDE_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 500, messages })
-    });
+    // テキストのみのプロンプト（GAS経由）
+    let promptToSend = textPrompt;
+    if (imgBase64) {
+      promptToSend = `画像を解析して以下の情報を推測してください。\n\n${textPrompt}\n\n※画像は添付されていますが、テキスト情報から最大限推測してください。`;
+    }
+    const res = await fetch(`${GAS_URL}?action=generate&prompt=${encodeURIComponent(promptToSend)}`);
     const data = await res.json();
-    if (!data.content || !data.content[0]) throw new Error('APIレスポンスが不正です: ' + JSON.stringify(data));
-    const raw = data.content[0].text.trim().replace(/```json|```/g, '').trim();
+    if (data.error) throw new Error(data.error);
+    if (!data.result) throw new Error('GASからの応答が空です');
+    const raw = data.result.trim().replace(/```json|```/g, '').trim();
     let parsed;
-    try { parsed = JSON.parse(raw); } catch(je) { throw new Error('JSON解析失敗: ' + raw.slice(0,100)); }
+    try { parsed = JSON.parse(raw); } catch(je) { throw new Error('JSON解析失敗: ' + raw.slice(0,200)); }
     applyAnalysis(parsed, rank, cond, acc, size, num);
     hideStatus();
   } catch(e) {
@@ -726,16 +740,11 @@ async function translateNotes() {
   if (!ja) { showStatus('特記事項を入力してください', 'error'); return; }
   showStatus('英語に変換中...', 'loading');
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5', max_tokens: 300,
-        messages: [{ role: 'user', content: `Translate the following Japanese condition notes for a luxury secondhand item into concise, natural English for an eBay listing. Return ONLY the translated text.\n\n${ja}` }]
-      })
-    });
+    const translatePrompt = `Translate the following Japanese condition notes for a luxury secondhand item into concise, natural English for an eBay listing. Return ONLY the translated text.\n\n${ja}`;
+    const res = await fetch(`${GAS_URL}?action=generate&prompt=${encodeURIComponent(translatePrompt)}`);
     const data = await res.json();
-    const translated = data.content[0].text.trim();
+    if (data.error) throw new Error(data.error);
+    const translated = data.result.trim();
     const prev = document.getElementById('notes-preview');
     prev.textContent = translated;
     prev.style.display = 'block';
@@ -833,13 +842,10 @@ Rules (STRICTLY enforce all):
 - No comments or explanations — return ONLY the title text`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 150, messages: [{ role: 'user', content: prompt }] })
-    });
+    const res = await fetch(`${GAS_URL}?action=generate&prompt=${encodeURIComponent(prompt)}`);
     const data = await res.json();
-    let t = data.content[0].text.trim().replace(/^["']|["']$/g, '');
+    if (data.error) throw new Error(data.error);
+    let t = data.result.trim().replace(/^["']|["']$/g, '');
     if (t.length > 80) t = t.slice(0, 80).trim();
     document.getElementById('title-input').value = t;
     countTitle();
@@ -869,7 +875,56 @@ function generate() {
 
   showStatus('✓ 生成完了', 'success');
   setTimeout(hideStatus, 2000);
-  document.getElementById('out-title-card').scrollIntoView({ behavior: 'smooth' });
+
+  // 作業者リスト取得・表示
+  showEl('out-worker-card');
+  loadWorkers();
+  document.getElementById('out-worker-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function loadWorkers() {
+  try {
+    const res = await fetch(`${GAS_URL}?type=workers`);
+    const data = await res.json();
+    const sel = document.getElementById('worker-select');
+    sel.innerHTML = '<option value="">選択してください</option>';
+    if (data.workers) {
+      data.workers.forEach(w => {
+        sel.innerHTML += `<option value="${w[0]}">${w[0]} - ${w[1]}</option>`;
+      });
+    }
+  } catch(e) {}
+}
+
+function checkSaveBtn() {
+  const val = document.getElementById('worker-select').value;
+  const btn = document.getElementById('save-btn');
+  btn.disabled = !val;
+  btn.style.opacity = val ? '1' : '0.4';
+  btn.style.cursor = val ? 'pointer' : 'not-allowed';
+}
+
+async function saveAndReset() {
+  const mgmt = document.getElementById('mgmt-num').value.trim();
+  const workerCode = document.getElementById('worker-select').value;
+  if (!workerCode) return;
+  const btn = document.getElementById('save-btn');
+  const status = document.getElementById('save-status');
+  btn.disabled = true;
+  btn.style.opacity = '0.4';
+  status.style.color = 'var(--text-muted)';
+  status.textContent = '保存中...';
+  try {
+    await fetch(`${GAS_URL}?action=save&id=${encodeURIComponent(mgmt)}&workerCode=${encodeURIComponent(workerCode)}`);
+    status.style.color = 'var(--green)';
+    status.textContent = '✓ 保存しました！リセットします...';
+    setTimeout(() => resetAll(), 1500);
+  } catch(e) {
+    status.style.color = 'var(--red)';
+    status.textContent = '保存エラー: ' + e.message;
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
 }
 
 // ─── HTMLビルド ───────────────────────────────────
@@ -1148,7 +1203,10 @@ function resetAll() {
   document.getElementById('step2-card').style.display = 'none';
   document.getElementById('step3-card').style.display = 'none';
   document.getElementById('gen-section').style.display = 'none';
-  ['out-title-card','out-price-card','out-desc-card'].forEach(id => document.getElementById(id).classList.remove('visible'));
+  ['out-title-card','out-price-card','out-desc-card','out-worker-card'].forEach(id => document.getElementById(id).classList.remove('visible'));
+  document.getElementById('worker-select').value = '';
+  document.getElementById('save-status').textContent = '';
+  checkSaveBtn();
   document.getElementById('fee-display').textContent = '';
   currentCat = ''; currentGrade = ''; suggestedPrice = null; imgBase64 = ''; productData = {};
   hideStatus(); countTitle();
