@@ -70,6 +70,12 @@
   .progress-bar-bg{background:#e0ddd8;border-radius:20px;height:6px;overflow:hidden}
   .progress-bar{background:var(--accent);height:6px;border-radius:20px;transition:width .3s;width:0%}
   .progress-text{font-size:11px;color:var(--text-muted);margin-top:4px;text-align:center}
+  .list-toggle-btn{width:100%;padding:10px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text);text-align:left;transition:background .15s}
+  .list-toggle-btn:hover{background:#eceae6}
+  .arrived-item{padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;cursor:pointer;font-size:13px;background:#fff;transition:background .15s}
+  .arrived-item:hover{background:#f5f4f1}
+  .arrived-item .item-num{font-weight:500;color:var(--text-muted);font-size:11px;margin-bottom:2px}
+  .arrived-item .item-name{color:var(--text)}
 </style>
 </head>
 <body>
@@ -82,6 +88,13 @@
   <!-- STEP 1：管理番号 -->
   <div class="step">
     <div class="step-header"><div class="step-num">1</div><span class="step-title">管理番号で商品を確認</span></div>
+    <div class="field">
+      <button class="list-toggle-btn" id="list-toggle-btn" onclick="toggleArrivedList()">📋 到着済み商品一覧を展開</button>
+      <div id="arrived-list-wrap" style="display:none;margin-top:8px">
+        <div id="arrived-list-status"></div>
+        <div id="arrived-list"></div>
+      </div>
+    </div>
     <div class="field">
       <label>管理番号</label>
       <div class="search-row">
@@ -175,7 +188,8 @@
     </div>
   </div>
 
-  <button class="submit-btn" id="submit-btn" onclick="submitAll()">提出する</button>
+  <button class="submit-btn" id="submit-btn" onclick="submitAll()">提出する（画像＋データ）</button>
+  <button class="submit-btn" id="save-btn" onclick="saveInfoOnly()" style="margin-top:10px;background:#555">商品情報を一時保存してリセット</button>
   <div id="submit-status"></div>
 </div>
 
@@ -189,6 +203,101 @@ let productName = '';
 let imageDataList = [];
 let recognition = null;
 let activeVoiceBtn = null;
+let arrivedListLoaded = false;
+let arrivedListOpen = false;
+
+// 到着済み一覧トグル
+async function toggleArrivedList() {
+  const wrap = document.getElementById('arrived-list-wrap');
+  const btn = document.getElementById('list-toggle-btn');
+  arrivedListOpen = !arrivedListOpen;
+  wrap.style.display = arrivedListOpen ? 'block' : 'none';
+  btn.textContent = arrivedListOpen ? '📋 到着済み商品一覧を閉じる' : '📋 到着済み商品一覧を展開';
+  if (arrivedListOpen && !arrivedListLoaded) {
+    document.getElementById('arrived-list-status').innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">読み込み中...</span></div>';
+    try {
+      const res = await fetch(`${GAS_URL}?action=arrivedList`);
+      const data = await res.json();
+      arrivedListLoaded = true;
+      document.getElementById('arrived-list-status').innerHTML = '';
+      const listEl = document.getElementById('arrived-list');
+      if (!data.items || data.items.length === 0) {
+        listEl.innerHTML = '<div class="status" style="color:var(--text-muted);padding:8px 0">対象商品がありません</div>';
+        return;
+      }
+      listEl.innerHTML = '';
+      data.items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'arrived-item';
+        div.innerHTML = `<div class="item-num">${item.id}</div><div class="item-name">${item.name}</div>`;
+        div.onclick = () => selectFromList(item.id, item.name);
+        listEl.appendChild(div);
+      });
+    } catch(e) {
+      document.getElementById('arrived-list-status').innerHTML = `<div class="status err">読み込みエラー：${e.message}</div>`;
+    }
+  }
+}
+
+// 一覧から選択
+async function selectFromList(id, name) {
+  document.getElementById('mgmt-num').value = id;
+  productName = name;
+  const card = document.getElementById('product-name');
+  card.textContent = name;
+  card.classList.remove('empty');
+  // 一覧を閉じる
+  arrivedListOpen = false;
+  document.getElementById('arrived-list-wrap').style.display = 'none';
+  document.getElementById('list-toggle-btn').textContent = '📋 到着済み商品一覧を展開';
+  // 既存データ取得・反映
+  await fetchProductData(id);
+}
+
+// 既存データ取得・フォーム反映
+async function fetchProductData(id) {
+  const status = document.getElementById('search-status');
+  status.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">データ取得中...</span></div>';
+  try {
+    const res = await fetch(`${GAS_URL}?id=${encodeURIComponent(id)}&fullId=${encodeURIComponent(id)}`);
+    const data = await res.json();
+    if (data.name) {
+      productName = data.name;
+      document.getElementById('product-name').textContent = data.name;
+      document.getElementById('product-name').classList.remove('empty');
+    }
+    // 採寸データ反映
+    if (data.sizeData) document.getElementById('size-data').value = data.sizeData;
+    // 状態メモ反映
+    if (data.condNote) document.getElementById('cond-note').value = data.condNote;
+    // ランク反映
+    if (data.rank) {
+      document.querySelectorAll('.rank-btn').forEach(b => {
+        b.classList.remove('sel');
+        if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${data.rank}'`)) {
+          b.classList.add('sel');
+          selectedRank = data.rank;
+        }
+      });
+    }
+    // 付属品反映
+    if (data.accData && data.accData !== 'なし、本体のみ') {
+      const accItems = data.accData.split('、');
+      document.querySelectorAll('.accessory-grid input[type="checkbox"]').forEach(cb => {
+        cb.checked = accItems.includes(cb.dataset.output);
+      });
+      // その他付属品
+      const knownOutputs = Array.from(document.querySelectorAll('.accessory-grid input[type="checkbox"]')).map(cb => cb.dataset.output);
+      const others = accItems.filter(a => !knownOutputs.includes(a));
+      if (others.length > 0) document.getElementById('accessory-other').value = others.join('、');
+    }
+    status.innerHTML = data.sizeData || data.rank
+      ? '<div class="status ok">既存データを反映しました</div>'
+      : '<div class="status ok">取得しました（既存データなし）</div>';
+  } catch(e) {
+    status.innerHTML = `<div class="status err">接続エラー：${e.message}</div>`;
+  }
+}
 
 // Google認証
 async function getAccessToken() {
@@ -282,27 +391,8 @@ async function fetchProduct() {
   const num = document.getElementById('mgmt-num').value.trim();
   if (!num) return;
   const btn = document.getElementById('search-btn');
-  const status = document.getElementById('search-status');
   btn.disabled = true;
-  status.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">検索中...</span></div>';
-  try {
-    const res = await fetch(`${GAS_URL}?id=${encodeURIComponent(num)}`);
-    const data = await res.json();
-    if (data.name) {
-      productName = data.name;
-      const card = document.getElementById('product-name');
-      card.textContent = productName;
-      card.classList.remove('empty');
-      status.innerHTML = '<div class="status ok">取得しました</div>';
-    } else {
-      status.innerHTML = '<div class="status err">管理番号が見つかりませんでした</div>';
-      document.getElementById('product-name').textContent = '管理番号を検索すると表示されます';
-      document.getElementById('product-name').classList.add('empty');
-      productName = '';
-    }
-  } catch(e) {
-    status.innerHTML = `<div class="status err">接続エラー：${e.message}</div>`;
-  }
+  await fetchProductData(num);
   btn.disabled = false;
 }
 
@@ -474,6 +564,34 @@ async function submitAll() {
   }
 }
 
+// 商品情報のみ一時保存（ステータス変更なし）
+async function saveInfoOnly() {
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  if (!productName) { alert('先に管理番号を検索してください'); return; }
+  const sizeData = document.getElementById('size-data').value.trim();
+  const condNote = document.getElementById('cond-note').value.trim();
+  const workerCode = document.getElementById('worker-select').value;
+  const checkedAcc = [];
+  document.querySelectorAll('.accessory-grid input[type="checkbox"]').forEach(cb => {
+    if (cb.checked && cb.dataset.output) checkedAcc.push(cb.dataset.output);
+  });
+  const accOther = document.getElementById('accessory-other').value.trim();
+  if (accOther) checkedAcc.push(accOther);
+  const accData = checkedAcc.length > 0 ? checkedAcc.join('、') : 'なし、本体のみ';
+  const btn = document.getElementById('save-btn');
+  const status = document.getElementById('submit-status');
+  btn.disabled = true;
+  status.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">保存中...</span></div>';
+  try {
+    await fetch(`${GAS_URL}?action=savePhotoInfo&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}`, {mode:'no-cors'});
+    status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 情報を保存しました（ステータス変更なし）。リセットします...</div>';
+    setTimeout(() => resetForm(), 2000);
+  } catch(e) {
+    status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
+    btn.disabled = false;
+  }
+}
+
 function resetForm() {
   document.getElementById('mgmt-num').value = '';
   document.getElementById('product-name').textContent = '管理番号を検索すると表示されます';
@@ -492,6 +610,8 @@ function resetForm() {
   imageDataList = [];
   productName = '';
   document.getElementById('submit-btn').disabled = false;
+  document.getElementById('save-btn').disabled = false;
+  arrivedListLoaded = false;
 }
 </script>
 </body>
