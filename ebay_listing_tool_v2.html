@@ -66,6 +66,15 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
 .voice-btn.recording { border-color: var(--red); color: var(--red); animation: pulse .8s infinite; }
 @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
 
+/* ドロップダウン一覧 */
+.list-toggle-btn{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer;font-family:'Outfit',sans-serif;color:var(--text);text-align:left;display:flex;justify-content:space-between;align-items:center;margin-bottom:0;}
+.list-toggle-btn:hover{border-color:var(--accent);}
+.list-wrap{display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:320px;overflow-y:auto;margin-bottom:12px;}
+.list-item{padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;background:#fff;display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden;}
+.list-item:hover{background:var(--surface2);}
+.list-item .item-num{font-weight:600;color:var(--text-muted);font-size:11px;flex-shrink:0;width:58px;font-family:'DM Mono',monospace;}
+.list-item .item-name{overflow:hidden;text-overflow:ellipsis;color:var(--text);}
+
 /* Step badge */
 .step-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--accent); color: #fff; border-radius: 50%; font-size: 10px; font-weight: 700; flex-shrink: 0; }
 
@@ -175,6 +184,17 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
 <!-- STEP 1: インプット -->
 <div class="card">
   <div class="card-label"><span class="step-badge">1</span> 商品情報の取り込み</div>
+
+  <div class="field">
+    <button class="list-toggle-btn" id="list-toggle-btn" onclick="toggleList()">
+      <span id="list-toggle-label">撮影済み商品一覧</span>
+      <span id="list-toggle-arrow">▼</span>
+    </button>
+    <div class="list-wrap" id="list-wrap">
+      <div id="list-status"></div>
+      <div id="list-body"></div>
+    </div>
+  </div>
 
   <div class="field">
     <div class="field-label">管理番号（6桁）</div>
@@ -487,6 +507,65 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
 // ─── 設定 ──────────────────────────────────────────
 const GAS_URL    = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhyXS1KzmO9syc61ZvjSOB6d3w2mxQmqfg9OTv62TBlIUx_/exec';
 const SHIPPING_JPY = 4000;
+
+// ─── 管理番号生成 ─────────────────────────────────
+function generateMgmtNum(id4, breakEven) {
+  const price = parseFloat(String(breakEven).replace(/,/g, '')) || 0;
+  if (!price) return id4;
+  const rounded = Math.round(price / 1000);
+  const text2 = String(rounded).padStart(2, '0').substring(0, 2);
+  const reversed = text2.split('').reverse().join('');
+  return id4 + reversed;
+}
+
+// ─── 撮影済みドロップダウン ───────────────────────
+let listLoaded = false;
+let listOpen = false;
+
+async function toggleList() {
+  const wrap = document.getElementById('list-wrap');
+  const arrow = document.getElementById('list-toggle-arrow');
+  const label = document.getElementById('list-toggle-label');
+  listOpen = !listOpen;
+  wrap.style.display = listOpen ? 'block' : 'none';
+  arrow.textContent = listOpen ? '▲' : '▼';
+  if (listOpen && !listLoaded) {
+    document.getElementById('list-status').innerHTML = '<div style="padding:10px 12px;color:var(--text-muted);font-size:12px;">読み込み中...</div>';
+    try {
+      const res = await fetch(GAS_URL + '?action=shootedList');
+      const data = await res.json();
+      listLoaded = true;
+      document.getElementById('list-status').innerHTML = '';
+      const listEl = document.getElementById('list-body');
+      if (!data.items || data.items.length === 0) {
+        listEl.innerHTML = '<div style="padding:10px 12px;color:var(--text-muted);font-size:12px;">対象商品がありません</div>';
+        return;
+      }
+      label.textContent = '撮影済み商品一覧（' + data.items.length + '件）';
+      listEl.innerHTML = '';
+      data.items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.innerHTML = '<span class="item-num">' + item.id + '</span><span class="item-name">' + item.name + '</span>';
+        div.onclick = () => selectItem(item.id, item.name, item.breakEven);
+        listEl.appendChild(div);
+      });
+    } catch(e) {
+      document.getElementById('list-status').innerHTML = '<div style="padding:10px 12px;color:var(--red);font-size:12px;">エラー：' + e.message + '</div>';
+    }
+  }
+}
+
+async function selectItem(id, name, breakEven) {
+  const id4 = id.toString().slice(0, 4);
+  const id6 = breakEven ? generateMgmtNum(id4, breakEven) : id4;
+  document.getElementById('mgmt-num').value = id6;
+  listOpen = false;
+  document.getElementById('list-wrap').style.display = 'none';
+  document.getElementById('list-toggle-arrow').textContent = '▼';
+  listLoaded = false;
+  await fetchProduct();
+}
 
 const CAT_FEE = { bag: 15, wallet: 15, accessory: 15, other: 13.25 };
 const CAT_FEE_LABEL = { bag: 'バッグ（15%）', wallet: '財布（15%）', accessory: 'アクセサリー・ジュエリー（15%）', other: 'その他（13.25%）' };
@@ -1307,6 +1386,10 @@ function resetAll() {
   checkSaveBtn();
   document.getElementById('fee-display').textContent = '';
   currentCat = ''; currentGrade = ''; suggestedPrice = null; imgBase64 = ''; productData = {};
+  listLoaded = false; listOpen = false;
+  document.getElementById('list-wrap').style.display = 'none';
+  document.getElementById('list-toggle-arrow').textContent = '▼';
+  document.getElementById('list-toggle-label').textContent = '撮影済み商品一覧';
   hideStatus(); countTitle();
   document.getElementById('analyze-btn').disabled = true;
 }
