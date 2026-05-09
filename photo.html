@@ -92,7 +92,7 @@
     <div class="field">
       <button class="list-toggle-btn" id="list-toggle-btn" onclick="toggleArrivedList()">
         <span id="list-toggle-label">到着済み商品一覧</span>
-        <span id="list-toggle-arrow">▶</span>
+        <span id="list-toggle-arrow">▼</span>
       </button>
       <div id="arrived-list-wrap" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);max-height:320px;overflow-y:auto">
         <div id="arrived-list-status"></div>
@@ -217,7 +217,7 @@ async function toggleArrivedList() {
   const label = document.getElementById('list-toggle-label');
   arrivedListOpen = !arrivedListOpen;
   wrap.style.display = arrivedListOpen ? 'block' : 'none';
-  arrow.textContent = arrivedListOpen ? '▼' : '▶';
+  arrow.textContent = arrivedListOpen ? '▲' : '▼';
   if (arrivedListOpen && !arrivedListLoaded) {
     document.getElementById('arrived-list-status').innerHTML = '<div class="loading" style="padding:10px 12px"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">読み込み中...</span></div>';
     try {
@@ -255,7 +255,7 @@ async function selectFromList(id, name) {
   // 一覧を閉じる
   arrivedListOpen = false;
   document.getElementById('arrived-list-wrap').style.display = 'none';
-  document.getElementById('list-toggle-arrow').textContent = '▶';
+  document.getElementById('list-toggle-arrow').textContent = '▼';
   // 既存データ取得・反映
   await fetchProductData(id);
 }
