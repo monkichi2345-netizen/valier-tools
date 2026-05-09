@@ -78,6 +78,13 @@
   .platform-tab:first-child{border-right:1px solid var(--border)}
   .platform-tab.active{background:var(--accent);color:#fff}
   .platform-tab:hover:not(.active){background:#f5f4f1}
+  .list-toggle-btn{width:100%;padding:10px 14px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text);text-align:left;transition:background .15s;display:flex;justify-content:space-between;align-items:center;margin-bottom:0}
+  .list-toggle-btn:hover{background:#eceae6}
+  .arrived-item{padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;background:#fff;transition:background .15s;display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}
+  .arrived-item:first-child{border-top:1px solid var(--border)}
+  .arrived-item:hover{background:#f5f4f1}
+  .arrived-item .item-num{font-weight:500;color:var(--text-muted);font-size:12px;flex-shrink:0;width:52px}
+  .arrived-item .item-name{color:var(--text);overflow:hidden;text-overflow:ellipsis}
 </style>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -90,6 +97,16 @@
 
   <div class="step">
     <div class="step-header"><div class="step-num">1</div><span class="step-title">管理番号で商品を検索</span></div>
+    <div class="field">
+      <button class="list-toggle-btn" id="list-toggle-btn" onclick="toggleShootedList()">
+        <span id="list-toggle-label">撮影済み商品一覧</span>
+        <span id="list-toggle-arrow">▼</span>
+      </button>
+      <div id="shooted-list-wrap" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);max-height:320px;overflow-y:auto;margin-bottom:10px">
+        <div id="shooted-list-status"></div>
+        <div id="shooted-list"></div>
+      </div>
+    </div>
     <div class="field">
       <label>管理番号</label>
       <div class="search-row">
@@ -178,6 +195,65 @@ const DRIVE_CLIENT_ID = '24568286649-p64c441e8mrgutb8p81e7it3jg2u8v7e.apps.googl
 const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 let driveAccessToken = null;
 let currentPlatform = 'mercari';
+let shootedListLoaded = false;
+let shootedListOpen = false;
+
+// 撮影済み一覧トグル
+async function toggleShootedList() {
+  const wrap = document.getElementById('shooted-list-wrap');
+  const arrow = document.getElementById('list-toggle-arrow');
+  const label = document.getElementById('list-toggle-label');
+  shootedListOpen = !shootedListOpen;
+  wrap.style.display = shootedListOpen ? 'block' : 'none';
+  arrow.textContent = shootedListOpen ? '▲' : '▼';
+  if (shootedListOpen && !shootedListLoaded) {
+    document.getElementById('shooted-list-status').innerHTML = '<div class="loading" style="padding:10px 12px"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">読み込み中...</span></div>';
+    try {
+      const res = await fetch(`${GAS_URL}?action=shootedList`);
+      const data = await res.json();
+      shootedListLoaded = true;
+      document.getElementById('shooted-list-status').innerHTML = '';
+      const listEl = document.getElementById('shooted-list');
+      if (!data.items || data.items.length === 0) {
+        listEl.innerHTML = '<div style="padding:10px 12px;font-size:13px;color:var(--text-muted)">対象商品がありません</div>';
+        return;
+      }
+      label.textContent = `撮影済み商品一覧（${data.items.length}件）`;
+      listEl.innerHTML = '';
+      data.items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'arrived-item';
+        div.innerHTML = `<span class="item-num">${item.id}</span><span class="item-name">${item.name}</span>`;
+        div.onclick = () => selectFromList(item.id, item.name, item.breakEven);
+        listEl.appendChild(div);
+      });
+    } catch(e) {
+      document.getElementById('shooted-list-status').innerHTML = `<div style="padding:10px 12px;font-size:13px;color:#c0392b">読み込みエラー：${e.message}</div>`;
+    }
+  }
+}
+
+// 6桁管理番号生成
+function generateMgmtNum(id4, breakEven) {
+  const price = parseFloat(String(breakEven).replace(/,/g, '')) || 0;
+  if (!price) return id4;
+  const rounded = Math.round(price / 1000);
+  const text2 = String(rounded).padStart(2, '0').substring(0, 2);
+  const reversed = text2.split('').reverse().join('');
+  return id4 + reversed;
+}
+
+// 一覧から選択
+async function selectFromList(id, name, breakEven) {
+  const id6 = breakEven ? generateMgmtNum(id.slice(0, 4), breakEven) : id;
+  document.getElementById('mgmt-num').value = id6;
+  shootedListOpen = false;
+  document.getElementById('shooted-list-wrap').style.display = 'none';
+  document.getElementById('list-toggle-arrow').textContent = '▼';
+  document.getElementById('list-toggle-label').textContent = '撮影済み商品一覧';
+  shootedListLoaded = false;
+  await fetchProduct();
+}
 
 async function getAccessToken() {
   return new Promise((resolve, reject) => {
