@@ -210,6 +210,18 @@ let activeVoiceBtn = null;
 let arrivedListLoaded = false;
 let arrivedListOpen = false;
 
+// 6桁管理番号生成（A列4桁 + D列仕入値から計算）
+function generateMgmtNum(id4, purchasePrice) {
+  const price = parseFloat(String(purchasePrice).replace(/,/g, '')) || 0;
+  if (!price) return id4; // 仕入値なければ4桁のまま
+  const str = String(Math.floor(price));
+  const first3 = str.substring(0, 3).padEnd(3, '0');
+  const rounded = Math.round(parseInt(first3) / 10) * 10; // 3桁目四捨五入
+  const top2 = String(Math.floor(rounded / 10)).padStart(2, '0').substring(0, 2);
+  const reversed = top2.split('').reverse().join('');
+  return id4 + reversed;
+}
+
 // 到着済み一覧トグル
 async function toggleArrivedList() {
   const wrap = document.getElementById('arrived-list-wrap');
@@ -265,12 +277,23 @@ async function fetchProductData(id) {
   const status = document.getElementById('search-status');
   status.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">データ取得中...</span></div>';
   try {
-    const res = await fetch(`${GAS_URL}?id=${encodeURIComponent(id)}&fullId=${encodeURIComponent(id)}`);
+    const id4 = id.toString().trim().slice(0, 4);
+    const res = await fetch(`${GAS_URL}?id=${encodeURIComponent(id4)}&fullId=${encodeURIComponent(id)}`);
     const data = await res.json();
-    if (data.name) {
-      productName = data.name;
-      document.getElementById('product-name').textContent = data.name;
-      document.getElementById('product-name').classList.remove('empty');
+    if (!data.name) {
+      status.innerHTML = '<div class="status err">管理番号が見つかりませんでした</div>';
+      document.getElementById('product-name').textContent = '管理番号を検索すると表示されます';
+      document.getElementById('product-name').classList.add('empty');
+      productName = '';
+      return;
+    }
+    productName = data.name;
+    document.getElementById('product-name').textContent = data.name;
+    document.getElementById('product-name').classList.remove('empty');
+    // 6桁管理番号を生成してセット
+    if (data.purchasePrice) {
+      const id6 = generateMgmtNum(id4, data.purchasePrice);
+      document.getElementById('mgmt-num').value = id6;
     }
     // 採寸データ反映
     if (data.sizeData) document.getElementById('size-data').value = data.sizeData;
@@ -292,7 +315,6 @@ async function fetchProductData(id) {
       document.querySelectorAll('.accessory-grid input[type="checkbox"]').forEach(cb => {
         cb.checked = accItems.includes(cb.dataset.output);
       });
-      // その他付属品
       const knownOutputs = Array.from(document.querySelectorAll('.accessory-grid input[type="checkbox"]')).map(cb => cb.dataset.output);
       const others = accItems.filter(a => !knownOutputs.includes(a));
       if (others.length > 0) document.getElementById('accessory-other').value = others.join('、');
