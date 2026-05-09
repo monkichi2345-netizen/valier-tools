@@ -210,15 +210,13 @@ let activeVoiceBtn = null;
 let arrivedListLoaded = false;
 let arrivedListOpen = false;
 
-// 6桁管理番号生成（A列4桁 + D列仕入値から計算）
-function generateMgmtNum(id4, purchasePrice) {
-  const price = parseFloat(String(purchasePrice).replace(/,/g, '')) || 0;
-  if (!price) return id4; // 仕入値なければ4桁のまま
-  const str = String(Math.floor(price));
-  const first3 = str.substring(0, 3).padEnd(3, '0');
-  const rounded = Math.round(parseInt(first3) / 10) * 10; // 3桁目四捨五入
-  const top2 = String(Math.floor(rounded / 10)).padStart(2, '0').substring(0, 2);
-  const reversed = top2.split('').reverse().join('');
+// 6桁管理番号生成（A列4桁 + E列損益分岐点から計算）
+function generateMgmtNum(id4, breakEven) {
+  const price = parseFloat(String(breakEven).replace(/,/g, '')) || 0;
+  if (!price) return id4;
+  const rounded = Math.round(price / 1000);
+  const text2 = String(rounded).padStart(2, '0').substring(0, 2); // 左2桁
+  const reversed = text2.split('').reverse().join('');
   return id4 + reversed;
 }
 
@@ -291,8 +289,8 @@ async function fetchProductData(id) {
     document.getElementById('product-name').textContent = data.name;
     document.getElementById('product-name').classList.remove('empty');
     // 6桁管理番号を生成してセット
-    if (data.purchasePrice) {
-      const id6 = generateMgmtNum(id4, data.purchasePrice);
+    if (data.breakEven) {
+      const id6 = generateMgmtNum(id4, data.breakEven);
       document.getElementById('mgmt-num').value = id6;
     }
     // 採寸データ反映
