@@ -1013,7 +1013,11 @@ async function generateTitle() {
 必ず「From Japan」で終わること。「From Japan」がない場合は出力前に追加すること。`;
 
   try {
-    const res = await fetch(`${GAS_URL}?action=generate&prompt=${encodeURIComponent(prompt)}`);
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'generate', prompt: prompt })
+    });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     let t = data.result.trim().replace(/^["']|["']$/g, '');
