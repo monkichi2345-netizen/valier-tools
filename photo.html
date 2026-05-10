@@ -82,7 +82,7 @@
 <body>
 <div class="container">
   <header>
-    <h1>VALIER 撮影提出ツール</h1>
+    <h1>撮影提出ツール</h1>
     <p>管理番号を入力して採寸・状態・画像を提出してください</p>
   </header>
 
@@ -172,6 +172,10 @@
   <div class="step">
     <div class="step-header"><div class="step-num">4</div><span class="step-title">商品画像（5〜20枚）</span></div>
     <div class="field">
+      <div id="existing-img-area" style="display:none;margin-bottom:10px">
+        <button onclick="downloadExistingImages()" style="width:100%;padding:10px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text)">📥 Driveの既存画像を一括ダウンロード</button>
+        <div id="existing-img-status" style="font-size:12px;margin-top:4px;color:var(--text-muted)"></div>
+      </div>
       <div class="upload-area" onclick="document.getElementById('img-input').click()">
         タップして画像を追加（複数選択可）
       </div>
@@ -192,8 +196,8 @@
     </div>
   </div>
 
-  <button class="submit-btn" id="submit-btn" onclick="submitAll()">提出する（画像＋データ）</button>
-  <button class="submit-btn" id="save-btn" onclick="saveInfoOnly()" style="margin-top:10px;background:#555">商品情報を一時保存してリセット</button>
+  <button class="submit-btn" id="save-btn" onclick="saveInfoOnly()" style="background:#888">商品情報を一時保存してリセット</button>
+  <button class="submit-btn" id="submit-btn" onclick="submitAll()" style="margin-top:10px;background:#42a5f5">全データをアップロード＆実績を登録する</button>
   <div id="submit-status"></div>
 </div>
 
@@ -320,8 +324,73 @@ async function fetchProductData(id) {
     status.innerHTML = data.sizeData || data.rank
       ? '<div class="status ok">既存データを反映しました</div>'
       : '<div class="status ok">取得しました（既存データなし）</div>';
+
+    // 既存画像チェック
+    await checkExistingImages();
   } catch(e) {
     status.innerHTML = `<div class="status err">接続エラー：${e.message}</div>`;
+  }
+}
+
+// 既存画像チェック（Driveにフォルダがあればダウンロードボタン表示）
+async function checkExistingImages() {
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  if (!mgmtNum) return;
+  try {
+    const res = await fetch(`${GAS_URL}?action=getFolder&mgmtNum=${encodeURIComponent(mgmtNum)}`);
+    const data = await res.json();
+    const area = document.getElementById('existing-img-area');
+    if (data.url) {
+      area.style.display = 'block';
+      area.dataset.folderId = data.url.match(/folders\/([a-zA-Z0-9_-]+)/)?.[1] || '';
+      document.getElementById('existing-img-status').textContent = 'Driveに既存画像があります';
+    } else {
+      area.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+// 既存画像一括ダウンロード
+async function downloadExistingImages() {
+  const folderId = document.getElementById('existing-img-area').dataset.folderId;
+  if (!folderId) return;
+  const status = document.getElementById('existing-img-status');
+  status.textContent = '認証中...';
+  try {
+    const token = await getAccessToken();
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const data = await res.json();
+    const files = (data.files || []).filter(f => f.mimeType.startsWith('image/'));
+    if (files.length === 0) { status.textContent = '画像が見つかりませんでした'; return; }
+    status.textContent = `${files.length}枚ダウンロード中...`;
+    for (const file of files) {
+      const imgRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, { headers: { Authorization: `Bearer ${token}` } });
+      const blob = await imgRes.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = file.name; a.click();
+      URL.revokeObjectURL(url);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    status.textContent = `✅ ${files.length}枚ダウンロード完了`;
+  } catch(e) {
+    status.textContent = `エラー：${e.message}`;
+  }
+}
+
+// Driveの既存画像を全削除
+async function deleteExistingImages(folderId, token) {
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,mimeType)`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const data = await res.json();
+  const files = (data.files || []).filter(f => f.mimeType.startsWith('image/'));
+  for (const file of files) {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
   }
 }
 
@@ -556,10 +625,16 @@ async function submitAll() {
     </div>`;
 
   try {
-    // Google認証
     const token = await getAccessToken();
-    
-    // 画像アップロード
+
+    // 既存画像を削除
+    const existingArea = document.getElementById('existing-img-area');
+    if (existingArea.style.display !== 'none' && existingArea.dataset.folderId) {
+      document.getElementById('progress-text').textContent = '既存画像を削除中...';
+      await deleteExistingImages(existingArea.dataset.folderId, token);
+    }
+
+    // 新しい画像をアップロード
     for (let i = 0; i < imageDataList.length; i++) {
       const img = imageDataList[i];
       const fileName = `${mgmtNum}_${String(i+1).padStart(2,'0')}.jpg`;
@@ -582,7 +657,7 @@ async function submitAll() {
     await fetch(`${GAS_URL}?action=savePhoto&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}`, {mode:'no-cors'});
 
     document.getElementById('progress-bar').style.width = '100%';
-    status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 提出完了しました！リセットします...</div>';
+    status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 完了しました！リセットします...</div>';
     setTimeout(() => resetForm(), 2000);
   } catch(e) {
     status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
@@ -590,7 +665,7 @@ async function submitAll() {
   }
 }
 
-// 商品情報のみ一時保存（ステータス変更なし）
+// 商品情報のみ一時保存（ステータス変更なし・画像があればDriveに保存）
 async function saveInfoOnly() {
   const mgmtNum = document.getElementById('mgmt-num').value.trim();
   if (!productName) { alert('先に管理番号を検索してください'); return; }
@@ -609,8 +684,22 @@ async function saveInfoOnly() {
   btn.disabled = true;
   status.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">保存中...</span></div>';
   try {
+    // 画像があればDriveにアップロード
+    if (imageDataList.length > 0) {
+      const token = await getAccessToken();
+      for (let i = 0; i < imageDataList.length; i++) {
+        const img = imageDataList[i];
+        const fileName = `${mgmtNum}_${String(i+1).padStart(2,'0')}.jpg`;
+        status.innerHTML = `<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">画像をアップロード中... ${i+1}/${imageDataList.length}</span></div>`;
+        await uploadToDrive(img.base64, fileName, DRIVE_FOLDER_ID, token);
+      }
+    }
+    // 情報を保存
     await fetch(`${GAS_URL}?action=savePhotoInfo&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}`, {mode:'no-cors'});
-    status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 情報を保存しました（ステータス変更なし）。リセットします...</div>';
+    const msg = imageDataList.length > 0
+      ? '✅ 画像と情報を保存しました（ステータス変更なし）。リセットします...'
+      : '✅ 情報を保存しました（ステータス変更なし）。リセットします...';
+    status.innerHTML = `<div class="status ok" style="font-size:14px;padding:12px 0">${msg}</div>`;
     setTimeout(() => resetForm(), 2000);
   } catch(e) {
     status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
@@ -633,6 +722,8 @@ function resetForm() {
   document.getElementById('img-preview').innerHTML = '';
   document.getElementById('img-count').textContent = '';
   document.getElementById('submit-status').innerHTML = '';
+  document.getElementById('existing-img-area').style.display = 'none';
+  document.getElementById('existing-img-status').textContent = '';
   imageDataList = [];
   productName = '';
   document.getElementById('submit-btn').disabled = false;
