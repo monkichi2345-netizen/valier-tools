@@ -411,7 +411,7 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
       <span class="char-badge" id="char-badge">0/80</span>
     </div>
     <div style="display:flex;gap:6px;">
-      <button class="btn btn-secondary btn-sm" onclick="generateTitle()">✨ AIタイトル生成</button>
+      <button class="btn btn-secondary btn-sm" id="title-gen-btn" onclick="generateTitle()">✨ AIタイトル生成</button>
       <button class="voice-btn btn-sm" style="padding:5px 10px;" onclick="startVoice('title-input')">🎤 EN</button>
     </div>
   </div>
@@ -777,12 +777,12 @@ function applyAnalysis(p, rank, cond, acc, size, num) {
   document.getElementById('step2-card').scrollIntoView({ behavior: 'smooth' });
 
   // AI解析完了後にタイトルを自動生成
-  setTimeout(async () => {
+  setTimeout(async () => { // 2秒待機してフィールド入力完了を確認
     const btn = document.getElementById('title-gen-btn');
     if (btn) btn.textContent = '⏳ タイトル生成中...';
     await generateTitle();
     if (btn) btn.textContent = '✏️ AIタイトル修正';
-  }, 500);
+  }, 2000);
 }
 
 // ランク文字列からグレードに変換
