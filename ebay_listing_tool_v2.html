@@ -775,6 +775,14 @@ function applyAnalysis(p, rank, cond, acc, size, num) {
   document.getElementById('step3-card').style.display = 'block';
   document.getElementById('gen-section').style.display = 'block';
   document.getElementById('step2-card').scrollIntoView({ behavior: 'smooth' });
+
+  // AI解析完了後にタイトルを自動生成
+  setTimeout(async () => {
+    const btn = document.getElementById('title-gen-btn');
+    if (btn) btn.textContent = '⏳ タイトル生成中...';
+    await generateTitle();
+    if (btn) btn.textContent = '✏️ AIタイトル修正';
+  }, 500);
 }
 
 // ランク文字列からグレードに変換
@@ -960,7 +968,7 @@ async function generateTitle() {
 - 商品と無関係な単語を入れない
 - 解説 説明 前置き メタ情報を出力しない
 - 真贋保証としてAuthenticまたはAuthを必ず含める
-- 末尾に必ずFrom Japanを入れる
+- 末尾に必ず「From Japan」を入れる（絶対に省略禁止・最優先ルール）
 - ブランド名は必ず全て大文字にする（例：CARTIER、GUCCI、CELINE）
 - 中古品なので基本的にVintageを含める（80文字を超える場合のみ省略可）
 - 理想の文字数は70〜80文字。短すぎる場合は情報を追加して70文字以上にする
@@ -1001,7 +1009,8 @@ async function generateTitle() {
 - その他エキゾチックレザーと判断されるワードは全て使用禁止
 
 【出力形式】
-タイトルのみを1行で出力する。他は何も出力しない。`;
+タイトルのみを1行で出力する。他は何も出力しない。
+必ず「From Japan」で終わること。「From Japan」がない場合は出力前に追加すること。`;
 
   try {
     const res = await fetch(`${GAS_URL}?action=generate&prompt=${encodeURIComponent(prompt)}`);
