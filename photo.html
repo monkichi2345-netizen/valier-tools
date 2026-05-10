@@ -112,6 +112,10 @@
       <label>商品名</label>
       <div class="product-card empty" id="product-name">管理番号を検索すると表示されます</div>
     </div>
+    <div id="existing-img-area" style="display:none;margin-top:8px">
+      <button onclick="downloadExistingImages()" style="padding:9px 14px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text)">📥 Driveの既存画像を一括ダウンロード</button>
+      <div id="existing-img-status" style="font-size:12px;margin-top:4px;color:var(--text-muted)"></div>
+    </div>
   </div>
 
   <!-- STEP 2：採寸・状態 -->
@@ -172,10 +176,6 @@
   <div class="step">
     <div class="step-header"><div class="step-num">4</div><span class="step-title">商品画像（5〜20枚）</span></div>
     <div class="field">
-      <div id="existing-img-area" style="display:none;margin-bottom:10px">
-        <button onclick="downloadExistingImages()" style="width:100%;padding:10px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text)">📥 Driveの既存画像を一括ダウンロード</button>
-        <div id="existing-img-status" style="font-size:12px;margin-top:4px;color:var(--text-muted)"></div>
-      </div>
       <div class="upload-area" onclick="document.getElementById('img-input').click()">
         タップして画像を追加（複数選択可）
       </div>
@@ -340,7 +340,6 @@ async function checkExistingImages(mgmtNum) {
   try {
     const res = await fetch(`${GAS_URL}?action=getFolder&mgmtNum=${encodeURIComponent(mgmtNum)}`);
     const data = await res.json();
-    alert('getFolder結果：' + JSON.stringify(data));
     const area = document.getElementById('existing-img-area');
     if (data.url) {
       area.style.display = 'block';
