@@ -932,25 +932,76 @@ async function generateTitle() {
 
   showStatus('AIタイトル生成中...', 'loading');
 
-  const prompt = `You are an eBay listing title expert for Japanese luxury secondhand goods.
+  const prompt = `あなたはeBayでブランドバッグを販売するトップセラーです。以下の「売れてきたeBayタイトル例」を学習し、同じ構造・語順・粒度でタイトルを生成してください。
 
-Create an eBay title based on:
-- Product name: ${name}
-- Brand: ${brand}
-- Material: ${mat}
-- Color: ${color}
-- Style/Type: ${style}
-- Category: ${cat}
+【商品情報】
+商品名: ${name}
+ブランド: ${brand}
+素材: ${mat}
+カラー: ${color}
+スタイル: ${style}
+カテゴリ: ${cat}
 
-Rules (STRICTLY enforce all):
-- Maximum 80 characters including spaces — count carefully, never exceed
-- Ideal range: 70–80 characters
-- English only
-- Brand name first
-- End with "Auth" (use "Auth" instead of "Authentic" to save characters)
-- Do NOT use hyphens
-- Do NOT use the word "Old"
-- No comments or explanations — return ONLY the title text`;
+【売れてきたタイトル例】
+- GUCCI Shoulder bag GG canvas leather Authentic From Japan
+- MIU MIU patent leather Tote bag A4 Vintage Authentic From Japan
+- GUCCI One Shoulder Bag Black Leather Authentic
+- Salvatore Ferragamo handbag black Vintage Authentic From Japan
+- CELINE Vanity Slide Lock Handbag Vintage Authentic From Japan
+- MIU MIU Handbag Leather Brown Vintage Authentic From Japan
+- GUCCI Sherry Line Clutch Bag Vintage Authentic From Japan
+- Bottega Veneta Leopard handbag Vintage Authentic From Japan
+- GUCCI Vanity bag black leather Vintage Authentic From Japan
+
+【絶対ルール（違反不可）】
+- 出力は英数字と半角スペースのみを使用する
+- 記号は一切使用しない
+- 改行しない 1行のみ
+- 商品と無関係な単語を入れない
+- 解説 説明 前置き メタ情報を出力しない
+- 真贋保証としてAuthenticまたはAuthを必ず含める
+- 末尾に必ずFrom Japanを入れる
+- ブランド名は必ず全て大文字にする（例：CARTIER、GUCCI、CELINE）
+- 中古品なので基本的にVintageを含める（80文字を超える場合のみ省略可）
+- 理想の文字数は70〜80文字。短すぎる場合は情報を追加して70文字以上にする
+
+【文字数制限 重要】
+- 出力前に必ず文字数をカウントする
+- 半角文字としてカウントする
+- 80文字を1文字でも超える場合は必ず短縮する
+- 80文字以内になるまで不要な情報を削除してから出力する
+
+【短縮時の優先削除ルール（必ずこの順で削る）】
+1. カラー
+2. 素材
+3. ライン名
+4. Vintage
+5. バッグタイプの補足語
+6. AuthenticをAuthに変更
+※ブランド名・Authentic(またはAuth)・From Japanは削除禁止
+
+【情報の並び順（固定）】
+1. ブランド名（大文字）
+2. バッグタイプ
+3. ライン・素材・特徴
+4. カラー
+5. Vintage
+6. Authentic
+7. From Japan
+
+【禁止事項】
+- 記号の使用
+- 不要語の追加
+- 指示文の復唱
+- 80文字超過
+- "Old"は使用禁止
+- "CROCODILE"は使用禁止
+- "Python"は使用禁止
+- "ostrich"は使用禁止
+- その他エキゾチックレザーと判断されるワードは全て使用禁止
+
+【出力形式】
+タイトルのみを1行で出力する。他は何も出力しない。`;
 
   try {
     const res = await fetch(`${GAS_URL}?action=generate&prompt=${encodeURIComponent(prompt)}`);
