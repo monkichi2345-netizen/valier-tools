@@ -293,8 +293,9 @@ async function fetchProductData(id) {
     document.getElementById('product-name').textContent = data.name;
     document.getElementById('product-name').classList.remove('empty');
     // 6桁管理番号を生成してセット
+    let id6 = id;
     if (data.breakEven) {
-      const id6 = generateMgmtNum(id4, data.breakEven);
+      id6 = generateMgmtNum(id4, data.breakEven);
       document.getElementById('mgmt-num').value = id6;
     }
     // 採寸データ反映
@@ -325,20 +326,21 @@ async function fetchProductData(id) {
       ? '<div class="status ok">既存データを反映しました</div>'
       : '<div class="status ok">取得しました（既存データなし）</div>';
 
-    // 既存画像チェック
-    await checkExistingImages();
+    // 既存画像チェック（6桁で検索）
+    await checkExistingImages(id6);
   } catch(e) {
     status.innerHTML = `<div class="status err">接続エラー：${e.message}</div>`;
   }
 }
 
 // 既存画像チェック（Driveにフォルダがあればダウンロードボタン表示）
-async function checkExistingImages() {
-  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+async function checkExistingImages(mgmtNum) {
+  if (!mgmtNum) mgmtNum = document.getElementById('mgmt-num').value.trim();
   if (!mgmtNum) return;
   try {
     const res = await fetch(`${GAS_URL}?action=getFolder&mgmtNum=${encodeURIComponent(mgmtNum)}`);
     const data = await res.json();
+    alert('getFolder結果：' + JSON.stringify(data));
     const area = document.getElementById('existing-img-area');
     if (data.url) {
       area.style.display = 'block';
@@ -346,8 +348,11 @@ async function checkExistingImages() {
       document.getElementById('existing-img-status').textContent = 'Driveに既存画像があります';
     } else {
       area.style.display = 'none';
+      document.getElementById('existing-img-status').textContent = '';
     }
-  } catch(e) {}
+  } catch(e) {
+    document.getElementById('existing-img-status').textContent = `画像チェックエラー：${e.message}`;
+  }
 }
 
 // 既存画像一括ダウンロード
