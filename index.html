@@ -269,8 +269,13 @@ function switchTab(platform) {
 function formatSizeData(raw) {
   if (!raw) return '';
   let s = raw.replace(/㎝/g, 'cm').replace(/センチ/g, 'cm');
-  s = s.replace(/(\d+(?:\.\d+)?cm)([^\d\n、。\s])/g, '$1\n$2');
+  // 「、」を改行に
+  s = s.replace(/、/g, '\n');
+  // 数字+cmの後に文字が来たら改行
+  s = s.replace(/(\d+(?:\.\d+)?cm)([^\d\n\s])/g, '$1\n$2');
+  // スペース区切りも改行に
   s = s.replace(/(\d+(?:\.\d+)?cm)\s+/g, '$1\n');
+  // 数字の前に「約」を付ける（すでに約がある場合は除く）
   s = s.replace(/([^約\d])(\d+(?:\.\d+)?cm)/g, '$1約$2');
   s = s.replace(/^(\d+(?:\.\d+)?cm)/, '約$1');
   return s.trim();
