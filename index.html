@@ -73,6 +73,18 @@
   .acc-item{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;transition:all .1s}
   .acc-item:hover{border-color:var(--border-hover);background:#f5f4f1}
   .acc-item input[type=checkbox]{width:14px;height:14px;cursor:pointer;flex-shrink:0}
+  .platform-tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:14px}
+  .platform-tab{flex:1;padding:11px;font-size:13px;font-weight:500;border:none;background:#fff;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text-muted);transition:all .15s;letter-spacing:0.04em}
+  .platform-tab:first-child{border-right:1px solid var(--border)}
+  .platform-tab.active{background:var(--accent);color:#fff}
+  .platform-tab:hover:not(.active){background:#f5f4f1}
+  .list-toggle-btn{width:100%;padding:10px 14px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text);text-align:left;transition:background .15s;display:flex;justify-content:space-between;align-items:center;margin-bottom:0}
+  .list-toggle-btn:hover{background:#eceae6}
+  .arrived-item{padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;background:#fff;transition:background .15s;display:flex;align-items:center;gap:10px;white-space:nowrap;overflow:hidden}
+  .arrived-item:first-child{border-top:1px solid var(--border)}
+  .arrived-item:hover{background:#f5f4f1}
+  .arrived-item .item-num{font-weight:500;color:var(--text-muted);font-size:12px;flex-shrink:0;width:52px}
+  .arrived-item .item-name{color:var(--text);overflow:hidden;text-overflow:ellipsis}
 </style>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -85,6 +97,16 @@
 
   <div class="step">
     <div class="step-header"><div class="step-num">1</div><span class="step-title">管理番号で商品を検索</span></div>
+    <div class="field">
+      <button class="list-toggle-btn" id="list-toggle-btn" onclick="toggleShootedList()">
+        <span id="list-toggle-label">撮影済み商品一覧</span>
+        <span id="list-toggle-arrow">▼</span>
+      </button>
+      <div id="shooted-list-wrap" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);max-height:320px;overflow-y:auto;margin-bottom:10px">
+        <div id="shooted-list-status"></div>
+        <div id="shooted-list"></div>
+      </div>
+    </div>
     <div class="field">
       <label>管理番号</label>
       <div class="search-row">
@@ -159,6 +181,10 @@
     </div>
   </div>
 
+  <div class="platform-tabs">
+    <button class="platform-tab active" id="tab-mercari" onclick="switchTab('mercari')">🛍️ メルカリ</button>
+    <button class="platform-tab" id="tab-yahoo" onclick="switchTab('yahoo')">🔨 ヤフオク</button>
+  </div>
   <button class="gen-btn" id="gen-btn" onclick="generate()">タイトル・説明文を生成</button>
   <div class="output-area" id="output-area"></div>
 </div>
@@ -168,6 +194,87 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhy
 const DRIVE_CLIENT_ID = '24568286649-p64c441e8mrgutb8p81e7it3jg2u8v7e.apps.googleusercontent.com';
 const DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 let driveAccessToken = null;
+let currentPlatform = 'mercari';
+let shootedListLoaded = false;
+let shootedListOpen = false;
+
+// 撮影済み一覧トグル
+async function toggleShootedList() {
+  const wrap = document.getElementById('shooted-list-wrap');
+  const arrow = document.getElementById('list-toggle-arrow');
+  const label = document.getElementById('list-toggle-label');
+  shootedListOpen = !shootedListOpen;
+  wrap.style.display = shootedListOpen ? 'block' : 'none';
+  arrow.textContent = shootedListOpen ? '▲' : '▼';
+  if (shootedListOpen && !shootedListLoaded) {
+    document.getElementById('shooted-list-status').innerHTML = '<div class="loading" style="padding:10px 12px"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">読み込み中...</span></div>';
+    try {
+      const res = await fetch(`${GAS_URL}?action=shootedList`);
+      const data = await res.json();
+      shootedListLoaded = true;
+      document.getElementById('shooted-list-status').innerHTML = '';
+      const listEl = document.getElementById('shooted-list');
+      if (!data.items || data.items.length === 0) {
+        listEl.innerHTML = '<div style="padding:10px 12px;font-size:13px;color:var(--text-muted)">対象商品がありません</div>';
+        return;
+      }
+      label.textContent = `撮影済み商品一覧（${data.items.length}件）`;
+      listEl.innerHTML = '';
+      data.items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'arrived-item';
+        div.innerHTML = `<span class="item-num" style="width:70px;color:#1a7f4b;font-size:11px">${item.pf}</span><span class="item-num">${item.id}</span><span class="item-name">${item.name}</span>`;
+        div.onclick = () => selectFromList(item.id, item.name, item.breakEven);
+        listEl.appendChild(div);
+      });
+    } catch(e) {
+      document.getElementById('shooted-list-status').innerHTML = `<div style="padding:10px 12px;font-size:13px;color:#c0392b">読み込みエラー：${e.message}</div>`;
+    }
+  }
+}
+
+// 6桁管理番号生成
+function generateMgmtNum(id4, breakEven) {
+  const price = parseFloat(String(breakEven).replace(/,/g, '')) || 0;
+  if (!price) return id4;
+  const rounded = Math.round(price / 1000);
+  const text2 = String(rounded).padStart(2, '0').substring(0, 2);
+  const reversed = text2.split('').reverse().join('');
+  return id4 + reversed;
+}
+
+// 一覧から選択
+async function selectFromList(id, name, breakEven) {
+  const id6 = breakEven ? generateMgmtNum(id.slice(0, 4), breakEven) : id;
+  document.getElementById('mgmt-num').value = id6;
+  shootedListOpen = false;
+  document.getElementById('shooted-list-wrap').style.display = 'none';
+  document.getElementById('list-toggle-arrow').textContent = '▼';
+  document.getElementById('list-toggle-label').textContent = '撮影済み商品一覧';
+  shootedListLoaded = false;
+  await fetchProduct();
+}
+
+// タブ切り替え
+function switchTab(platform) {
+  currentPlatform = platform;
+  document.getElementById('tab-mercari').classList.toggle('active', platform === 'mercari');
+  document.getElementById('tab-yahoo').classList.toggle('active', platform === 'yahoo');
+  const btn = document.getElementById('gen-btn');
+  btn.textContent = platform === 'mercari' ? 'タイトル・説明文を生成' : 'ヤフオク用タイトル・説明文を生成';
+  document.getElementById('output-area').innerHTML = '';
+}
+
+// 採寸データ整形
+function formatSizeData(raw) {
+  if (!raw) return '';
+  let s = raw.replace(/㎝/g, 'cm').replace(/センチ/g, 'cm');
+  s = s.replace(/(\d+(?:\.\d+)?cm)([^\d\n、。\s])/g, '$1\n$2');
+  s = s.replace(/(\d+(?:\.\d+)?cm)\s+/g, '$1\n');
+  s = s.replace(/([^約\d])(\d+(?:\.\d+)?cm)/g, '$1約$2');
+  s = s.replace(/^(\d+(?:\.\d+)?cm)/, '約$1');
+  return s.trim();
+}
 
 async function getAccessToken() {
   return new Promise((resolve, reject) => {
@@ -356,18 +463,226 @@ function copyText(id) {
   setTimeout(() => btn.innerText = 'コピー', 1500);
 }
 
-// 採寸データ整形：センチ→cm、数字前に約、数字後に改行
-function formatSizeData(raw) {
-  if (!raw) return '';
-  let s = raw.replace(/㎝/g, 'cm').replace(/センチ/g, 'cm');
-  s = s.replace(/(\d+(?:\.\d+)?cm)([^\d\n、。\s])/g, '$1\n$2');
-  s = s.replace(/(\d+(?:\.\d+)?cm)\s+/g, '$1\n');
-  s = s.replace(/([^約\d])(\d+(?:\.\d+)?cm)/g, '$1約$2');
-  s = s.replace(/^(\d+(?:\.\d+)?cm)/, '約$1');
-  return s.trim();
+async function generateYahoo() {
+  if (!productName) { alert('先に管理番号を検索してください'); return; }
+  if (!selectedRank) { alert('商品状態ランクを選択してください'); return; }
+
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  const area = document.getElementById('output-area');
+  area.innerHTML = '<div class="loading" style="margin-top:1rem"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">生成中...</span></div>';
+
+  const condNote = document.getElementById('condition-note').value.trim();
+  const checkedAcc = [];
+  document.querySelectorAll('.accessory-grid input[type="checkbox"]').forEach(cb => {
+    if (cb.checked && cb.dataset.output) checkedAcc.push(cb.dataset.output);
+  });
+  const accOther = document.getElementById('accessory-other').value.trim();
+  if (accOther) checkedAcc.push(accOther);
+  const accText = checkedAcc.length > 0 ? checkedAcc.join('、') : 'なし、本体のみ';
+  const sizeData = formatSizeData(document.getElementById('size-data').value.trim());
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+
+  const yahooRankMap = {'S':'S','SA':'SA','A':'A','AB+':'AB','AB':'AB','AB-':'AB','B+':'B','B':'B','B-':'B','BC':'C'};
+  const yahooRank = yahooRankMap[selectedRank] || selectedRank;
+
+  const rankComment = {
+    'S':'未使用保管品と判断できる程、素晴らしいコンディションです。プレゼント・ギフトにもおすすめできるお品物です。',
+    'SA':'極わずかな使用感はあるものの、ほとんど使用感を感じさせない、大変状態の良い素晴らしいコンディションのお品です。',
+    'A':'背面の押し跡など多少のスレや使用感はありますが、全体的に状態の良い大変キレイなお品物です。',
+    'AB+':'使用感やダメージはありますが、その他全体的にはキレイな状態を保ったお品です。',
+    'AB':'使用感やダメージはありますが、その他全体的にはキレイな状態を保ったお品です。',
+    'AB-':'使用感やダメージはありますが、その他全体的にはキレイな状態を保ったお品です。',
+    'B+':'使用感やダメージがございます。画像をよくご確認ください。',
+    'B':'使用感やダメージがございます。画像をよくご確認ください。',
+    'B-':'使用感やダメージがございます。画像をよくご確認ください。',
+    'BC':'大きなダメージや目立つ汚れなどがございます。画像をよくご確認ください。'
+  };
+  const commentFull = condNote ? `${condNote}。${rankComment[selectedRank]}` : rankComment[selectedRank];
+
+  const prompt = `あなたはヤフオク出品アシスタントです。以下のルールで出力してください。
+
+【商品情報】
+管理番号：${mgmtNum}
+タイトル参考：${productName}（先頭の数字・記号は仕入先番号のため含めない）
+状態ランク：${selectedRank}
+採寸：${sizeData || 'なし'}
+状態特記：${condNote || 'なし'}
+
+【タイトルルール】
+・65文字以内、できるだけ65文字に近づける
+・先頭：S→【未使用保管品】/ SA→【未使用級】/ A→【極美品】/ AB,AB+,AB-→【美品】/ B,B+,B-,BC→なし
+・構成：【状態】ブランド英語 カタカナ ライン 素材 カテゴリ複数 用途 「鞄」or「財布」で締め
+
+【出力ルール（厳守）】
+・コードブロック2つのみ
+・1つ目：タイトルのみ1行
+・2つ目：カラー名のみ1行
+・コードブロック外に文字一切書かない`;
+
+  const callAPI = async (p) => {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'generate', prompt: p })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.result;
+  };
+
+  const parseBlocks = (text) => {
+    return [...text.matchAll(/```[\s\S]*?```/g)].map(m => m[0].replace(/^```[^\n]*\n?/,'').replace(/\n?```$/,'').trim());
+  };
+
+  try {
+    let text = await callAPI(prompt);
+    let blocks = parseBlocks(text);
+    if (blocks.length < 2) throw new Error('フォーマットエラー');
+
+    let title = blocks[0];
+    const color = blocks[1] || 'ー';
+    let tLen = [...title].length;
+
+    if (tLen > 65) {
+      const fixPrompt = `以下のヤフオクタイトルが${tLen}文字あり65文字を超えています。65文字以内に収めてコードブロックで出力してください。コードブロック外には何も書かないでください。\n現在のタイトル：${title}`;
+      const fixText = await callAPI(fixPrompt);
+      const fixBlocks = parseBlocks(fixText);
+      if (fixBlocks.length > 0) { title = fixBlocks[0]; tLen = [...title].length; }
+    }
+
+    const desc = `ご覧いただきありがとうございます。
+下記の商品説明をお読みいただいた上で、どうぞごゆっくりオークションをお楽しみください。
+(管理：${mgmtNum})
+
+◆サイズ
+${sizeData || '記載なし'}
+※素人採寸のため、多少誤差はご容赦ください。
+
+◆状態ランク： ${yahooRank}
+
+状態ランク詳細
+N：一度も使用されていない新品と断定できるお品
+S：展示品など新品ではないが、未使用品と評価できる使用感・ダメージの無いお品
+SA：ダメージのほとんどない未使用品に近いお品 
+A：目立ちにくいダメージや多少の使用感はあるが、状態が良いお品 
+AB：使用感やダメージはあるが、ご使用には問題のない良いお品 
+B：全体的に傷や汚れがあり、使用感をかなり感じるお品
+C： 全体的に傷や汚れ、ダメージがあり通常使用に問題のあるジャンクを含むお品
+
+◆${commentFull}
+
+◆カラー
+${color}
+
+◆付属品
+${accText}
+
+◆購入元
+ ブランドリユース店 日本流通自主管理協会加盟店（AACD） 
+質屋・古物市場・ストア商品・買取 全て鑑定済み商品です。 
+
+◆注意事項
+商品画像・説明欄をご確認の上、ノークレームノーリターンでお願い致します。
+
+当然ですが、厳正な真贋判定をクリアした正規品のみを出品しておりますのでご安心ください。
+
+全てのお品が二次流通品となります。新品・未使用等の記載があっても、流通や保管による僅かなダメージがある場合がございます。
+
+また商品状態の認識には個人差がございます。画像をよくご確認いただき、ご入札をお願い致します。
+
+入札・落札後にご購入者様都合のキャンセル、取り消しは一切お受け致しかねます。
+
+新規の方の入札や評価が悪い方の入札は取り消しさせて頂く場合がございます。 
+
+オークション終了後24時間以内にお手続きの開始をお願い致します。また支払いが確認出来ないまま4日経過した場合は、予告なしに取り消しさせて頂きます。その場合、落札者都合による削除とし自動的に非常に悪い評価となりますこと予めご了承ください。
+
+なるべく忠実に写真を写していますが、撮影環境や画面の色彩などによる若干の色味の違いはご了承下さい。 
+
+細かい色の認識や、ブランド正式カラー名との相違、数センチの採寸相違などがある場合がございます。細かな点が気になる方はご入札をお控えください。
+
+出品するお品はほとんどが二次流通品となります。できるだけ画像や説明分で掲載するよう心掛けておりますが、掲載しきれない使用に問題の無い範囲のスレ/キズ/汚れ/ヒビ/型崩れ/変色/匂い/埃などがある場合がございますので予めご了承ください。
+
+商品にはクリーニング、メンテナンスを必要に応じて施しております。耐久性を考慮したメンテナンスを心掛けておりますが、状態によって補色などのリペアを施す場合もございますので、メンテナンスやリペアにご理解いただけない方はご入札をご遠慮ください。
+
+配送時における物損や紛失等のトラブルに関しましては、当方での責任は負いかねますのでご了承ください。
+
+タイトルは当方主観であり、単にキーワードとして記載しているものもございます。ご入札に際しましては商品画像や商品説明欄をしっかりとご確認の上、ご入札をお願いします。
+
+「サイズが合わない」「イメージと違う」等の理由での返品は出来かねますので、よくご確認の上ご入札をお願い致します。
+
+付属品の品質が理由での返品はお受け出来かねますので、予めご了承ください。
+
+当方ではSDGsの観点から、できるだけコンパクトな梱包を心掛けております。また梱包材には再利用資材なども使用する場合もございますので、ご了承をお願い致します。
+
+気になる点は入札前に必ずご質問からお問い合わせください。ご質問をされず落札された場合のクレームには応じかねますのでご了承ください。
+
+領収書の発行は行っておりません。YAHOO!かんたん決済の支払い明細等をご利用ください。
+
+落札希望金額に至らなかった場合は、予告なく出品を取り消す場合がございますのでご了承ください。
+
+先日より評価数の少ない方からご落札後ご購入いただけない事例が多数発生しております。大変申し訳ございませんが、評価数の少ない・低評価の多い方からの入札はトラブル回避のため入札削除させていただく場合がございますので、ご了承いただきますようお願いいたします。
+
+ご入札・ご落札された方は、上記内容をご了承いただいたものとさせて頂きます。 
+
+◆最後までお読みいただき誠にありがとうございます。 
+お取引終了まで迅速かつ丁寧に対応させて頂きますので、宜しくお願い致します。`;
+
+    let workerOptions = '<option value="">選択してください</option>';
+    try {
+      const wRes = await fetch(`${GAS_URL}?type=workers`);
+      const wData = await wRes.json();
+      if (wData.workers) {
+        wData.workers.forEach(w => { workerOptions += `<option value="${w[0]}">${w[0]} - ${w[1]}</option>`; });
+      }
+    } catch(e) {}
+
+    area.innerHTML = `
+      <hr class="divider">
+      <div style="font-size:11px;font-weight:500;color:#777;letter-spacing:0.06em;margin-bottom:10px;padding:6px 12px;background:#f5f4f1;border-radius:6px;display:inline-block">🔨 ヤフオク用</div>
+      <div class="out-block">
+        <div class="out-header">
+          <span class="out-label">タイトル</span>
+          <div class="out-actions">
+            <span class="char-badge ${tLen>65?'over':''}">${tLen} / 65文字</span>
+            <button class="copy-btn" onclick="copyText('t-out')">コピー</button>
+          </div>
+        </div>
+        <div class="out-text" id="t-out">${title}</div>
+      </div>
+      <div class="out-block">
+        <div class="out-header">
+          <span class="out-label">出品価格</span>
+          <button class="copy-btn" onclick="copyText('p-out')">コピー</button>
+        </div>
+        <div class="out-text" id="p-out">${(productPrice && productPrice !== '') ? productPrice : '1000000'}</div>
+        ${(!productPrice || productPrice === '') ? `<div class="status err" style="margin-top:6px">⚠️ 価格未定のため下書き保存</div>` : ''}
+      </div>
+      <div class="out-block">
+        <div class="out-header">
+          <span class="out-label">商品説明</span>
+          <button class="copy-btn" onclick="copyText('d-out')">コピー</button>
+        </div>
+        <div class="out-text" id="d-out">${desc}</div>
+      </div>
+      <div class="out-block">
+        <div class="out-header"><span class="out-label">作業者</span></div>
+        <select id="worker-select" style="width:100%;font-family:inherit;font-size:14px;padding:9px 12px;border:1px solid #e0ddd8;border-radius:6px;background:#fff;color:#1a1a1a;margin-bottom:12px">
+          ${workerOptions}
+        </select>
+        <button onclick="saveAndReset('${mgmtNum}')" style="width:100%;padding:13px;background:#1a7f4b;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;letter-spacing:0.05em">
+          出品実績を保存してリセット
+        </button>
+        <div id="save-status" style="margin-top:8px"></div>
+      </div>`;
+  } catch(e) {
+    area.innerHTML = `<div class="status err" style="margin-top:1rem">エラー：${e.message}</div>`;
+  }
+  btn.disabled = false;
 }
 
 async function generate() {
+  if (currentPlatform === 'yahoo') { generateYahoo(); return; }
   if (!productName) { alert('先に管理番号を検索してください'); return; }
   if (!selectedRank) { alert('商品状態ランクを選択してください'); return; }
 
