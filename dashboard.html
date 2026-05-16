@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VALIER ダッシュボード</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#f7f6f3;--surface:#ffffff;--surface2:#f0ede8;
+    --border:#e0dbd2;--border2:#ccc8bf;
+    --text:#1a1917;--text2:#6b6760;--text3:#a8a49f;
+    --accent:#1a1917;--accent-fg:#fff;
+    --green:#1a6b3c;--green-bg:#e8f5ee;
+    --orange:#c45c00;--orange-bg:#fff0e6;
+    --red:#b83232;--red-bg:#fdf0f0;
+    --blue:#1a4a8a;--blue-bg:#eef3fb;
+    --radius:12px;--radius-sm:8px;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:14px;line-height:1.6;min-height:100vh;padding:20px 16px 60px}
+  .container{max-width:760px;margin:0 auto}
+
+  /* ヘッダー */
+  header{margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid var(--text)}
+  header h1{font-size:20px;font-weight:700;letter-spacing:0.12em}
+  header p{font-size:11px;color:var(--text2);margin-top:3px;letter-spacing:0.06em}
+
+  /* 期間選択 */
+  .period-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+  .period-title{font-size:11px;font-weight:700;letter-spacing:0.1em;color:var(--text2);text-transform:uppercase;margin-bottom:12px}
+  .period-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .period-row input[type=date]{font-family:'Noto Sans JP',sans-serif;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;color:var(--text);outline:none;flex:1;min-width:120px}
+  .period-row input[type=date]:focus{border-color:var(--border2)}
+  .period-sep{font-size:12px;color:var(--text3);flex-shrink:0}
+  .btn-group{display:flex;gap:6px;flex-wrap:wrap}
+  .quick-btn{padding:7px 14px;font-size:12px;font-family:'Noto Sans JP',sans-serif;font-weight:500;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;cursor:pointer;color:var(--text);transition:all .15s;white-space:nowrap}
+  .quick-btn:hover{background:var(--surface2)}
+  .quick-btn.active{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+  .load-btn{padding:8px 20px;font-size:13px;font-family:'Noto Sans JP',sans-serif;font-weight:700;border:none;border-radius:var(--radius-sm);background:var(--accent);color:var(--accent-fg);cursor:pointer;letter-spacing:0.06em;transition:opacity .15s}
+  .load-btn:hover{opacity:.85}
+  .load-btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* セクション */
+  .section{margin-bottom:16px}
+  .section-label{font-size:11px;font-weight:700;letter-spacing:0.12em;color:var(--text2);text-transform:uppercase;margin-bottom:10px;padding-left:2px}
+
+  /* カードグリッド */
+  .card-grid{display:grid;gap:10px}
+  .card-grid.col2{grid-template-columns:1fr 1fr}
+  .card-grid.col4{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .card-label{font-size:10px;font-weight:700;letter-spacing:0.1em;color:var(--text3);text-transform:uppercase;margin-bottom:6px}
+  .card-value{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;line-height:1.2}
+  .card-sub{font-size:11px;color:var(--text2);margin-top:4px}
+  .card.green{border-color:#b3dfc5;background:var(--green-bg)}
+  .card.green .card-value{color:var(--green)}
+  .card.orange{border-color:#f5c9a0;background:var(--orange-bg)}
+  .card.orange .card-value{color:var(--orange)}
+  .card.red{border-color:#f5b8b8;background:var(--red-bg)}
+  .card.red .card-value{color:var(--red)}
+  .card.blue{border-color:#b3c8ef;background:var(--blue-bg)}
+  .card.blue .card-value{color:var(--blue)}
+
+  /* 在庫詳細 */
+  .stock-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .stock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+  .stock-label{font-size:10px;font-weight:700;letter-spacing:0.1em;color:var(--text3);margin-bottom:8px}
+  .stock-main{display:flex;align-items:baseline;gap:6px}
+  .stock-count{font-family:'DM Mono',monospace;font-size:26px;font-weight:500}
+  .stock-unit{font-size:12px;color:var(--text2)}
+  .stock-amount{font-family:'DM Mono',monospace;font-size:13px;color:var(--text2);margin-top:4px}
+  .stock-card.healthy .stock-count{color:var(--green)}
+  .stock-card.hold .stock-count{color:var(--orange)}
+  .stock-card.hold{border-color:#f5c9a0;background:var(--orange-bg)}
+  .stock-card.repair .stock-count{color:var(--red)}
+  .stock-card.repair{border-color:#f5b8b8;background:var(--red-bg)}
+
+  /* 出品中内訳 */
+  .listing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+  .listing-item{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
+  .listing-pf{font-size:12px;color:var(--text2)}
+  .listing-count{font-family:'DM Mono',monospace;font-size:16px;font-weight:500}
+
+  /* 仕入れ先テーブル */
+  .buyer-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:10px}
+  .buyer-section-title{padding:12px 16px;background:var(--surface2);font-size:11px;font-weight:700;letter-spacing:0.1em;color:var(--text2);border-bottom:1px solid var(--border)}
+  table{width:100%;border-collapse:collapse}
+  th{padding:10px 12px;font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--text3);text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child{text-align:left}
+  td{padding:10px 12px;font-size:13px;border-bottom:1px solid var(--border);text-align:right}
+  td:first-child{text-align:left;font-weight:500}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:var(--surface2)}
+  .mono{font-family:'DM Mono',monospace}
+  .good{color:var(--green)}
+  .bad{color:var(--red)}
+  .zero{color:var(--text3)}
+
+  /* ローディング */
+  .loading-wrap{display:flex;align-items:center;gap:10px;padding:40px 0;justify-content:center;color:var(--text2);font-size:13px}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--text2);display:inline-block;animation:pulse 1.2s infinite}
+  .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+  @keyframes pulse{0%,80%,100%{opacity:.2}40%{opacity:1}}
+  .empty-state{text-align:center;padding:40px 0;color:var(--text3);font-size:13px}
+
+  @media(max-width:480px){
+    .card-grid.col4{grid-template-columns:1fr 1fr}
+    .stock-grid{grid-template-columns:1fr 1fr}
+    .listing-grid{grid-template-columns:1fr 1fr}
+    .card-value{font-size:18px}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>VALIER</h1>
+    <p>DASHBOARD</p>
+  </header>
+
+  <!-- 期間選択 -->
+  <div class="period-card">
+    <div class="period-title">集計期間（販売日）</div>
+    <div class="period-row" style="margin-bottom:10px">
+      <input type="date" id="start-date">
+      <span class="period-sep">〜</span>
+      <input type="date" id="end-date">
+      <button class="load-btn" id="load-btn" onclick="loadDashboard()">集計</button>
+    </div>
+    <div class="btn-group">
+      <button class="quick-btn active" onclick="setQuick('thisMonth',this)">今月</button>
+      <button class="quick-btn" onclick="setQuick('lastMonth',this)">先月</button>
+      <button class="quick-btn" onclick="setQuick('last3',this)">直近3ヶ月</button>
+      <button class="quick-btn" onclick="setQuick('thisYear',this)">今年度</button>
+      <button class="quick-btn" onclick="setQuick('all',this)">全期間</button>
+    </div>
+  </div>
+
+  <div id="dashboard-content">
+    <div class="empty-state">期間を選択して「集計」を押してください</div>
+  </div>
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhyXS1KzmO9syc61ZvjSOB6d3w2mxQmqfg9OTv62TBlIUx_/exec';
+
+// 今月をデフォルト設定
+function init() {
+  setQuick('thisMonth', document.querySelector('.quick-btn.active'));
+}
+
+function setQuick(type, btn) {
+  document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const now = new Date();
+  let start, end;
+  if (type === 'thisMonth') {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (type === 'lastMonth') {
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    end = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if (type === 'last3') {
+    start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (type === 'thisYear') {
+    start = new Date(now.getFullYear(), 3, 1); // 4月始まり
+    end = new Date(now.getFullYear() + 1, 2, 31);
+  } else {
+    document.getElementById('start-date').value = '';
+    document.getElementById('end-date').value = '';
+    return;
+  }
+  document.getElementById('start-date').value = fmt(start);
+  document.getElementById('end-date').value = fmt(end);
+}
+
+function fmt(d) {
+  return d.toISOString().slice(0,10);
+}
+
+function fmtMoney(n) {
+  if (n === null || n === undefined) return '-';
+  return '¥' + Math.round(n).toLocaleString();
+}
+
+function fmtRate(r) {
+  if (r === null || r === undefined || r === '0') return '-';
+  return r + '%';
+}
+
+async function loadDashboard() {
+  const start = document.getElementById('start-date').value;
+  const end = document.getElementById('end-date').value;
+  const btn = document.getElementById('load-btn');
+  btn.disabled = true;
+
+  document.getElementById('dashboard-content').innerHTML = `
+    <div class="loading-wrap">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span>集計中...</span>
+    </div>`;
+
+  try {
+    let url = `${GAS_URL}?action=getDashboard`;
+    if (start) url += `&startDate=${start}`;
+    if (end) url += `&endDate=${end}`;
+    const res = await fetch(url);
+    const d = await res.json();
+    renderDashboard(d);
+  } catch(e) {
+    document.getElementById('dashboard-content').innerHTML = `<div class="empty-state">エラー：${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderDashboard(d) {
+  const s = d.sales;
+  const st = d.stock;
+  const b = d.buyers;
+
+  const profitClass = parseFloat(s.profitRate) >= 20 ? 'green' : parseFloat(s.profitRate) >= 10 ? '' : 'red';
+
+  // 出品中合計
+  const listingTotal = Object.values(st.listing).reduce((a,c) => a+c, 0);
+
+  // 仕入れ先テーブル行生成
+  function buyerRow(name, data) {
+    if (data.count === 0) return '';
+    const rateClass = parseFloat(data.profitRate) >= 20 ? 'good' : parseFloat(data.profitRate) >= 10 ? '' : 'bad';
+    return `<tr>
+      <td>${name}</td>
+      <td class="mono">${data.count}点</td>
+      <td class="mono">${fmtMoney(data.avgCost)}</td>
+      <td class="mono ${rateClass}">${fmtRate(data.profitRate)}</td>
+      <td class="mono">${fmtMoney(data.profitPerItem)}</td>
+      <td class="mono">${fmtMoney(data.totalProfit)}</td>
+    </tr>`;
+  }
+
+  const flatBuyers = ['OBA','タイムレス','ハッピー','トキオカ','その他平場'];
+  const netBuyers = ['バリュエンス','JPA','RECLO','セカンドストリート','ブランディア','その他ネット'];
+
+  const flatRows = flatBuyers.map(n => buyerRow(n, b[n] || {count:0})).join('');
+  const netRows = netBuyers.map(n => buyerRow(n, b[n] || {count:0})).join('');
+
+  const theadHtml = `<thead><tr>
+    <th>仕入れ先</th>
+    <th>販売点数</th>
+    <th>平均仕入単価</th>
+    <th>利益率</th>
+    <th>利益単価</th>
+    <th>利益合計</th>
+  </tr></thead>`;
+
+  document.getElementById('dashboard-content').innerHTML = `
+    <!-- 売上 -->
+    <div class="section">
+      <div class="section-label">売上</div>
+      <div class="card-grid col4">
+        <div class="card">
+          <div class="card-label">売上</div>
+          <div class="card-value">${fmtMoney(s.total)}</div>
+          <div class="card-sub">${s.count}点販売</div>
+        </div>
+        <div class="card ${profitClass}">
+          <div class="card-label">月利</div>
+          <div class="card-value">${fmtMoney(s.profit)}</div>
+          <div class="card-sub">利益率 ${fmtRate(s.profitRate)}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">利益率</div>
+          <div class="card-value">${fmtRate(s.profitRate)}</div>
+          <div class="card-sub">&nbsp;</div>
+        </div>
+        <div class="card">
+          <div class="card-label">販売点数</div>
+          <div class="card-value">${s.count}<span style="font-size:14px;margin-left:2px">点</span></div>
+          <div class="card-sub">&nbsp;</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 在庫 -->
+    <div class="section">
+      <div class="section-label">未出品在庫</div>
+      <div class="stock-grid">
+        <div class="stock-card healthy">
+          <div class="stock-label">健全在庫</div>
+          <div class="stock-main">
+            <span class="stock-count">${st.healthy.count}</span>
+            <span class="stock-unit">点</span>
+          </div>
+          <div class="stock-amount">${fmtMoney(st.healthy.amount)}</div>
+        </div>
+        <div class="stock-card hold">
+          <div class="stock-label">📦 保留品</div>
+          <div class="stock-main">
+            <span class="stock-count">${st.hold.count}</span>
+            <span class="stock-unit">点</span>
+          </div>
+          <div class="stock-amount">${fmtMoney(st.hold.amount)}</div>
+        </div>
+        <div class="stock-card repair">
+          <div class="stock-label">🔧 要修復</div>
+          <div class="stock-main">
+            <span class="stock-count">${st.repair.count}</span>
+            <span class="stock-unit">点</span>
+          </div>
+          <div class="stock-amount">${fmtMoney(st.repair.amount)}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 出品中 -->
+    <div class="section">
+      <div class="section-label">出品中 <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:500;color:var(--text)">${listingTotal}点</span></div>
+      <div class="listing-grid">
+        ${Object.entries(st.listing).map(([pf, cnt]) => `
+          <div class="listing-item">
+            <span class="listing-pf">${pf}</span>
+            <span class="listing-count">${cnt}<span style="font-size:11px;color:var(--text2)">点</span></span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- 仕入れ先：平場 -->
+    <div class="section">
+      <div class="section-label">仕入れ先別パフォーマンス</div>
+      <div class="buyer-section">
+        <div class="buyer-section-title">平場オークション</div>
+        <table>${theadHtml}<tbody>${flatRows || '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px">データなし</td></tr>'}</tbody></table>
+      </div>
+      <div class="buyer-section">
+        <div class="buyer-section-title">ネット仕入れ</div>
+        <table>${theadHtml}<tbody>${netRows || '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px">データなし</td></tr>'}</tbody></table>
+      </div>
+    </div>
+  `;
+}
+
+init();
+</script>
+</body>
+</html>
