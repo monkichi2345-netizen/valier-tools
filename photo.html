@@ -77,6 +77,17 @@
   .arrived-item:hover{background:#f5f4f1}
   .arrived-item .item-num{font-weight:500;color:var(--text-muted);font-size:12px;flex-shrink:0;width:38px}
   .arrived-item .item-name{color:var(--text);overflow:hidden;text-overflow:ellipsis}
+  .flag-row{display:flex;gap:8px;margin-top:6px}
+  .flag-btn{flex:1;padding:10px 6px;font-size:13px;font-weight:500;border:none;border-radius:var(--radius-sm);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:opacity .15s}
+  .flag-btn:disabled{opacity:.35;cursor:not-allowed}
+  .flag-btn:hover:not(:disabled){opacity:.85}
+  .flag-btn.hold{background:#f0a500;color:#fff}
+  .flag-btn.repair{background:#e67e22;color:#fff}
+  .flag-btn.clear{background:#e0ddd8;color:var(--text)}
+  .flag-status{font-size:12px;margin-top:5px;min-height:18px}
+  .flag-current{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;margin-top:4px}
+  .flag-current.hold{background:#fff3cd;color:#856404}
+  .flag-current.repair{background:#ffe5cc;color:#7d3c00}
 </style>
 </head>
 <body>
@@ -196,6 +207,18 @@
     </div>
   </div>
 
+  <!-- 区分フラグ -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">★</div><span class="step-title">区分フラグ</span></div>
+    <div id="flag-current-wrap" style="margin-bottom:10px;min-height:22px"></div>
+    <div class="flag-row">
+      <button class="flag-btn hold" id="flag-hold-btn" onclick="setFlag('保留品')" disabled>保留品</button>
+      <button class="flag-btn repair" id="flag-repair-btn" onclick="setFlag('要修復')" disabled>要修復</button>
+      <button class="flag-btn clear" id="flag-clear-btn" onclick="setFlag('')" disabled>フラグ解除</button>
+    </div>
+    <div class="flag-status" id="flag-status"></div>
+  </div>
+
   <button class="submit-btn" id="save-btn" onclick="saveInfoOnly()" style="background:#888">商品情報を一時保存してリセット</button>
   <button class="submit-btn" id="submit-btn" onclick="submitAll()" style="margin-top:10px;background:#42a5f5">全データをアップロード＆実績を登録する</button>
   <div id="submit-status"></div>
@@ -213,6 +236,46 @@ let recognition = null;
 let activeVoiceBtn = null;
 let arrivedListLoaded = false;
 let arrivedListOpen = false;
+let currentFlag = '';
+
+// フラグボタン有効化
+function enableFlagButtons(flag) {
+  currentFlag = flag || '';
+  document.getElementById('flag-hold-btn').disabled = false;
+  document.getElementById('flag-repair-btn').disabled = false;
+  document.getElementById('flag-clear-btn').disabled = false;
+  updateFlagDisplay(currentFlag);
+}
+
+// フラグ表示更新
+function updateFlagDisplay(flag) {
+  const wrap = document.getElementById('flag-current-wrap');
+  if (flag === '保留品') {
+    wrap.innerHTML = '<span class="flag-current hold">📦 保留品</span>';
+  } else if (flag === '要修復') {
+    wrap.innerHTML = '<span class="flag-current repair">🔧 要修復</span>';
+  } else {
+    wrap.innerHTML = '<span style="font-size:12px;color:var(--text-hint)">フラグなし</span>';
+  }
+}
+
+// フラグ送信
+async function setFlag(flag) {
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  if (!mgmtNum) { alert('先に管理番号を検索してください'); return; }
+  const status = document.getElementById('flag-status');
+  status.innerHTML = '<span style="color:var(--text-muted)">送信中...</span>';
+  try {
+    await fetch(`${GAS_URL}?action=setFlag&id=${encodeURIComponent(mgmtNum)}&flag=${encodeURIComponent(flag)}`, { mode: 'no-cors' });
+    currentFlag = flag;
+    updateFlagDisplay(flag);
+    const label = flag === '保留品' ? '📦 保留品' : flag === '要修復' ? '🔧 要修復' : '✅ フラグ解除';
+    status.innerHTML = `<span style="color:var(--success)">${label} を設定しました</span>`;
+    setTimeout(() => { status.innerHTML = ''; }, 3000);
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--danger)">エラー：${e.message}</span>`;
+  }
+}
 
 // 6桁管理番号生成（A列4桁 + E列損益分岐点から計算）
 function generateMgmtNum(id4, breakEven) {
@@ -322,6 +385,9 @@ async function fetchProductData(id) {
       const others = accItems.filter(a => !knownOutputs.includes(a));
       if (others.length > 0) document.getElementById('accessory-other').value = others.join('、');
     }
+    // フラグボタン有効化
+    enableFlagButtons(data.flag || '');
+
     status.innerHTML = data.sizeData || data.rank
       ? '<div class="status ok">既存データを反映しました</div>'
       : '<div class="status ok">取得しました（既存データなし）</div>';
@@ -736,6 +802,12 @@ function resetForm() {
   document.getElementById('submit-status').innerHTML = '';
   document.getElementById('existing-img-area').style.display = 'none';
   document.getElementById('existing-img-status').textContent = '';
+  document.getElementById('flag-hold-btn').disabled = true;
+  document.getElementById('flag-repair-btn').disabled = true;
+  document.getElementById('flag-clear-btn').disabled = true;
+  document.getElementById('flag-status').innerHTML = '';
+  document.getElementById('flag-current-wrap').innerHTML = '';
+  currentFlag = '';
   imageDataList = [];
   productName = '';
   document.getElementById('submit-btn').disabled = false;
