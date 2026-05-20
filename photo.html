@@ -185,7 +185,7 @@
 
   <!-- STEP 4：画像 -->
   <div class="step">
-    <div class="step-header"><div class="step-num">4</div><span class="step-title">商品画像（5〜20枚）</span></div>
+    <div class="step-header"><div class="step-num">4</div><span class="step-title">商品画像（1〜20枚）</span></div>
     <div class="field">
       <div class="upload-area" onclick="document.getElementById('img-input').click()">
         タップして画像を追加（複数選択可）
@@ -597,8 +597,8 @@ function renderPreviews() {
     preview.appendChild(wrap);
   });
   const c = imageDataList.length;
-  count.textContent = c > 0 ? `${c}枚選択中${c < 5 ? '（最低5枚必要です）' : ''}` : '';
-  count.style.color = c > 0 && c < 5 ? 'var(--danger)' : 'var(--text-muted)';
+  count.textContent = c > 0 ? `${c}枚選択中` : '';
+  count.style.color = 'var(--text-muted)';
 }
 
 function removeImage(id) {
@@ -688,7 +688,7 @@ async function submitAll() {
   const workerCode = document.getElementById('worker-select').value;
 
   if (!productName) { alert('先に管理番号を検索してください'); return; }
-  if (imageDataList.length < 5) { alert('画像を5枚以上追加してください'); return; }
+  if (imageDataList.length < 1) { alert('画像を1枚以上追加してください'); return; }
   if (imageDataList.length > 20) { alert('画像は20枚以内にしてください'); return; }
   if (!workerCode) { alert('作業者を選択してください'); return; }
 
