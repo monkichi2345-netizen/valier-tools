@@ -185,7 +185,7 @@
 
   <!-- STEP 4：画像 -->
   <div class="step">
-    <div class="step-header"><div class="step-num">4</div><span class="step-title">商品画像（1〜20枚）</span></div>
+    <div class="step-header"><div class="step-num">4</div><span class="step-title">商品画像（5〜20枚）</span></div>
     <div class="field">
       <div class="upload-area" onclick="document.getElementById('img-input').click()">
         タップして画像を追加（複数選択可）
@@ -220,7 +220,8 @@
   </div>
 
   <button class="submit-btn" id="save-btn" onclick="saveInfoOnly()" style="background:#888">商品情報を一時保存してリセット</button>
-  <button class="submit-btn" id="submit-btn" onclick="submitAll()" style="margin-top:10px;background:#42a5f5">全データをアップロード＆実績を登録する</button>
+  <button class="submit-btn" id="add-btn" onclick="addImages()" style="margin-top:10px;background:#66bb6a">既存のアルバムに画像を追加する</button>
+  <button class="submit-btn" id="submit-btn" onclick="submitAll()" style="margin-top:10px;background:#42a5f5">全データをアップロード&実績を登録する</button>
   <div id="submit-status"></div>
 </div>
 
@@ -597,8 +598,8 @@ function renderPreviews() {
     preview.appendChild(wrap);
   });
   const c = imageDataList.length;
-  count.textContent = c > 0 ? `${c}枚選択中` : '';
-  count.style.color = 'var(--text-muted)';
+  count.textContent = c > 0 ? `${c}枚選択中${c < 5 ? '（最低5枚必要です）' : ''}` : '';
+  count.style.color = c > 0 && c < 5 ? 'var(--danger)' : 'var(--text-muted)';
 }
 
 function removeImage(id) {
@@ -680,6 +681,60 @@ function startVoice(targetId, btn) {
   recognition.start();
 }
 
+// 既存アルバムに画像を追加
+async function addImages() {
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  if (!productName) { alert('先に管理番号を検索してください'); return; }
+  if (imageDataList.length < 1) { alert('追加する画像を選択してください'); return; }
+
+  const btn = document.getElementById('add-btn');
+  const status = document.getElementById('submit-status');
+  btn.disabled = true;
+
+  status.innerHTML = `
+    <div class="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="progress-text" id="progress-text">Google認証中...</div>
+    </div>`;
+
+  try {
+    const token = await getAccessToken();
+
+    // 既存画像の枚数を取得（ファイル名の連番に使う）
+    const existingArea = document.getElementById('existing-img-area');
+    let existingCount = 0;
+    if (existingArea.style.display !== 'none' && existingArea.dataset.folderId) {
+      document.getElementById('progress-text').textContent = '既存画像数を確認中...';
+      const listRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q='${existingArea.dataset.folderId}'+in+parents+and+trashed=false&fields=files(id)`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const listData = await listRes.json();
+      existingCount = (listData.files || []).length;
+    }
+
+    // 画像を追加アップロード（既存枚数の続き番号から）
+    for (let i = 0; i < imageDataList.length; i++) {
+      const img = imageDataList[i];
+      const fileName = `${mgmtNum}_${String(existingCount + i + 1).padStart(2, '0')}.jpg`;
+      document.getElementById('progress-text').textContent = `画像をアップロード中... ${i+1}/${imageDataList.length}`;
+      await uploadToDrive(img.base64, fileName, DRIVE_FOLDER_ID, token);
+      const pct = Math.round((i + 1) / imageDataList.length * 100);
+      document.getElementById('progress-bar').style.width = pct + '%';
+    }
+
+    status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 画像を追加しました！</div>';
+    btn.disabled = false;
+    // 画像リストだけクリア
+    imageDataList = [];
+    document.getElementById('img-preview').innerHTML = '';
+    document.getElementById('img-count').textContent = '';
+  } catch(e) {
+    status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
+    btn.disabled = false;
+  }
+}
+
 // 提出処理
 async function submitAll() {
   const mgmtNum = document.getElementById('mgmt-num').value.trim();
@@ -688,7 +743,7 @@ async function submitAll() {
   const workerCode = document.getElementById('worker-select').value;
 
   if (!productName) { alert('先に管理番号を検索してください'); return; }
-  if (imageDataList.length < 1) { alert('画像を1枚以上追加してください'); return; }
+  if (imageDataList.length < 5) { alert('画像を5枚以上追加してください'); return; }
   if (imageDataList.length > 20) { alert('画像は20枚以内にしてください'); return; }
   if (!workerCode) { alert('作業者を選択してください'); return; }
 
@@ -812,6 +867,7 @@ function resetForm() {
   productName = '';
   document.getElementById('submit-btn').disabled = false;
   document.getElementById('save-btn').disabled = false;
+  document.getElementById('add-btn').disabled = false;
   arrivedListLoaded = false;
 }
 </script>
