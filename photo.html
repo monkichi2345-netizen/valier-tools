@@ -123,6 +123,11 @@
       <label>商品名</label>
       <div class="product-card empty" id="product-name">管理番号を検索すると表示されます</div>
     </div>
+    <div class="field" id="platform-area" style="display:none;margin-top:8px">
+      <label>販路 <span id="platform-current" style="font-weight:normal;color:var(--text-muted);font-size:12px"></span></label>
+      <div id="platform-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+      <div id="platform-status" style="font-size:12px;margin-top:4px;color:var(--text-muted)"></div>
+    </div>
     <div id="existing-img-area" style="display:none;margin-top:8px">
       <button onclick="openDriveFolder()" style="padding:9px 14px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text)">📁 Driveの画像フォルダを開く</button>
       <div id="existing-img-status" style="font-size:12px;margin-top:4px;color:var(--text-muted)"></div>
@@ -395,8 +400,67 @@ async function fetchProductData(id) {
 
     // 既存画像チェック（6桁で検索）
     await checkExistingImages(id6);
+    // 販路表示
+    await loadPlatform(id4, data.pf || '');
   } catch(e) {
     status.innerHTML = `<div class="status err">接続エラー：${e.message}</div>`;
+  }
+}
+
+// 販路読み込み・表示
+let platformList = [];
+async function loadPlatform(id4, currentPf) {
+  const area = document.getElementById('platform-area');
+  const btns = document.getElementById('platform-btns');
+  const currentLabel = document.getElementById('platform-current');
+
+  area.style.display = 'block';
+  btns.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">取得中...</span>';
+
+  try {
+    if (platformList.length === 0) {
+      const res = await fetch(`${GAS_URL}?action=platformList`);
+      const data = await res.json();
+      platformList = data.platforms || [];
+    }
+
+    currentLabel.textContent = currentPf ? `現在：${currentPf}` : '現在：未設定';
+
+    btns.innerHTML = '';
+    platformList.forEach(pf => {
+      const btn = document.createElement('button');
+      btn.textContent = pf;
+      const isActive = pf === currentPf;
+      btn.style.cssText = `padding:7px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:all .15s;background:${isActive ? 'var(--accent)' : 'var(--bg)'};color:${isActive ? 'var(--accent-fg)' : 'var(--text)'};font-weight:${isActive ? '500' : 'normal'}`;
+      btn.onclick = () => savePlatform(id4, pf, btn);
+      btns.appendChild(btn);
+    });
+  } catch(e) {
+    btns.innerHTML = `<span style="font-size:12px;color:var(--danger)">取得エラー：${e.message}</span>`;
+  }
+}
+
+async function savePlatform(id4, pf, clickedBtn) {
+  const statusEl = document.getElementById('platform-status');
+  const currentLabel = document.getElementById('platform-current');
+
+  document.getElementById('platform-btns').querySelectorAll('button').forEach(b => {
+    b.style.background = 'var(--bg)';
+    b.style.color = 'var(--text)';
+    b.style.fontWeight = 'normal';
+  });
+  clickedBtn.style.background = 'var(--accent)';
+  clickedBtn.style.color = 'var(--accent-fg)';
+  clickedBtn.style.fontWeight = '500';
+
+  statusEl.textContent = '保存中...';
+  try {
+    await fetch(`${GAS_URL}?action=savePlatform&id=${encodeURIComponent(id4)}&platform=${encodeURIComponent(pf)}`, { mode: 'no-cors' });
+    currentLabel.textContent = `現在：${pf}`;
+    statusEl.textContent = '✅ 販路を変更しました';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+  } catch(e) {
+    statusEl.textContent = `エラー：${e.message}`;
   }
 }
 
@@ -855,6 +919,10 @@ function resetForm() {
   document.getElementById('img-preview').innerHTML = '';
   document.getElementById('img-count').textContent = '';
   document.getElementById('submit-status').innerHTML = '';
+  document.getElementById('platform-area').style.display = 'none';
+  document.getElementById('platform-btns').innerHTML = '';
+  document.getElementById('platform-current').textContent = '';
+  document.getElementById('platform-status').textContent = '';
   document.getElementById('existing-img-area').style.display = 'none';
   document.getElementById('existing-img-status').textContent = '';
   document.getElementById('flag-hold-btn').disabled = true;
