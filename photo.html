@@ -136,7 +136,7 @@
 
   <!-- STEP 2：採寸・状態 -->
   <div class="step">
-    <div class="step-header"><div class="step-num">2</div><span class="step-title">採寸・状態メモ・ランク</span></div>
+    <div class="step-header"><div class="step-num">2</div><span class="step-title">採寸・状態メモ・ランク・型番・カラー</span></div>
     <div class="field">
       <label>採寸データ</label>
       <div class="voice-row">
@@ -149,6 +149,20 @@
       <div class="voice-row">
         <textarea id="cond-note" rows="3" placeholder="例：表面にスレあり、内側に薄い変色、金具に小傷"></textarea>
         <button class="voice-btn" onclick="startVoice('cond-note',this)" title="音声入力">🎤</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>モデル・型番（任意）</label>
+      <div class="voice-row">
+        <input type="text" id="model-num" placeholder="例：447942 / GG Marmont" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text)"/>
+        <button class="voice-btn" onclick="startVoice('model-num',this)" title="音声入力">🎤</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>カラー（任意）</label>
+      <div class="voice-row">
+        <input type="text" id="color-val" placeholder="例：ブラック、ベージュ×ブラウン" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text)"/>
+        <button class="voice-btn" onclick="startVoice('color-val',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
@@ -371,6 +385,9 @@ async function fetchProductData(id) {
     if (data.sizeData) document.getElementById('size-data').value = data.sizeData;
     // 状態メモ反映
     if (data.condNote) document.getElementById('cond-note').value = data.condNote;
+    // モデル・型番・カラー反映
+    if (data.modelNum) document.getElementById('model-num').value = data.modelNum;
+    if (data.colorVal) document.getElementById('color-val').value = data.colorVal;
     // ランク反映
     if (data.rank) {
       document.querySelectorAll('.rank-btn').forEach(b => {
@@ -851,7 +868,9 @@ async function submitAll() {
     const accData = checkedAcc.length > 0 ? checkedAcc.join('、') : 'なし、本体のみ';
 
     document.getElementById('progress-text').textContent = 'データを保存中...';
-    await fetch(`${GAS_URL}?action=savePhoto&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}`, {mode:'no-cors'});
+        const modelNum = document.getElementById('model-num').value.trim();
+    const colorVal = document.getElementById('color-val').value.trim();
+    await fetch(`${GAS_URL}?action=savePhoto&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}&modelNum=${encodeURIComponent(modelNum)}&colorVal=${encodeURIComponent(colorVal)}`, {mode:'no-cors'});
 
     document.getElementById('progress-bar').style.width = '100%';
     status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 完了しました！リセットします...</div>';
@@ -892,7 +911,9 @@ async function saveInfoOnly() {
       }
     }
     // 情報を保存
-    await fetch(`${GAS_URL}?action=savePhotoInfo&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}`, {mode:'no-cors'});
+        const modelNum2 = document.getElementById('model-num').value.trim();
+    const colorVal2 = document.getElementById('color-val').value.trim();
+    await fetch(`${GAS_URL}?action=savePhotoInfo&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}&modelNum=${encodeURIComponent(modelNum2)}&colorVal=${encodeURIComponent(colorVal2)}`, {mode:'no-cors'});
     const msg = imageDataList.length > 0
       ? '✅ 画像と情報を保存しました（ステータス変更なし）。リセットします...'
       : '✅ 情報を保存しました（ステータス変更なし）。リセットします...';
@@ -911,6 +932,8 @@ function resetForm() {
   document.getElementById('search-status').innerHTML = '';
   document.getElementById('size-data').value = '';
   document.getElementById('cond-note').value = '';
+  document.getElementById('model-num').value = '';
+  document.getElementById('color-val').value = '';
   document.getElementById('worker-select').value = '';
   document.querySelectorAll('.rank-btn').forEach(b => b.classList.remove('sel'));
   selectedRank = '';
