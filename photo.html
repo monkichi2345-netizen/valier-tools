@@ -57,7 +57,7 @@
   .dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);display:inline-block;animation:pulse 1.2s infinite}
   .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
   @keyframes pulse{0%,80%,100%{opacity:.2}40%{opacity:1}}
-  .rank-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .rank-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
   .rank-btn{padding:9px 4px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text);text-align:center;transition:all .1s;line-height:1.4}
   .rank-btn:hover{border-color:var(--border-hover);background:#f5f4f1}
   .rank-btn.sel{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -166,15 +166,25 @@
       </div>
     </div>
     <div class="field">
+      <label>原産国（任意）</label>
+      <div class="voice-row">
+        <input type="text" id="origin-val" placeholder="例：Italy、France、Japan" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text)"/>
+        <button class="voice-btn" onclick="startVoice('origin-val',this)" title="音声入力">🎤</button>
+      </div>
+    </div>
+    <div class="field">
       <label>商品状態ランク</label>
       <div class="rank-grid">
         <button class="rank-btn" onclick="selRank(this,'S')"><div>S</div><div class="rank-desc">未使用保管品</div></button>
         <button class="rank-btn" onclick="selRank(this,'SA')"><div>SA</div><div class="rank-desc">未使用級</div></button>
         <button class="rank-btn" onclick="selRank(this,'A')"><div>A</div><div class="rank-desc">極美品</div></button>
+        <button class="rank-btn" onclick="selRank(this,'AB+')"><div>AB+</div><div class="rank-desc">AB上位</div></button>
         <button class="rank-btn" onclick="selRank(this,'AB')"><div>AB</div><div class="rank-desc">美品</div></button>
+        <button class="rank-btn" onclick="selRank(this,'AB-')"><div>AB-</div><div class="rank-desc">AB下位</div></button>
+        <button class="rank-btn" onclick="selRank(this,'B+')"><div>B+</div><div class="rank-desc">B上位</div></button>
         <button class="rank-btn" onclick="selRank(this,'B')"><div>B</div><div class="rank-desc">難あり</div></button>
+        <button class="rank-btn" onclick="selRank(this,'B-')"><div>B-</div><div class="rank-desc">B下位</div></button>
         <button class="rank-btn" onclick="selRank(this,'BC')"><div>BC</div><div class="rank-desc">ジャンク</div></button>
-        <button class="rank-btn" onclick="selRank(this,'C')"><div>C</div><div class="rank-desc">要修復</div></button>
       </div>
     </div>
   </div>
@@ -385,6 +395,7 @@ async function fetchProductData(id) {
     // モデル・型番・カラー反映
     if (data.modelNum) document.getElementById('model-num').value = data.modelNum;
     if (data.colorVal) document.getElementById('color-val').value = data.colorVal;
+    if (data.originVal) document.getElementById('origin-val').value = data.originVal;
     // ランク反映
     if (data.rank) {
       document.querySelectorAll('.rank-btn').forEach(b => {
@@ -867,7 +878,7 @@ async function submitAll() {
     document.getElementById('progress-text').textContent = 'データを保存中...';
         const modelNum = document.getElementById('model-num').value.trim();
     const colorVal = document.getElementById('color-val').value.trim();
-    await fetch(`${GAS_URL}?action=savePhoto&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}&modelNum=${encodeURIComponent(modelNum)}&colorVal=${encodeURIComponent(colorVal)}`, {mode:'no-cors'});
+    await fetch(`${GAS_URL}?action=savePhoto&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}&modelNum=${encodeURIComponent(modelNum)}&colorVal=${encodeURIComponent(colorVal)}&originVal=${encodeURIComponent(document.getElementById('origin-val').value.trim())}`, {mode:'no-cors'});
 
     document.getElementById('progress-bar').style.width = '100%';
     status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 完了しました！リセットします...</div>';
@@ -910,7 +921,7 @@ async function saveInfoOnly() {
     // 情報を保存
         const modelNum2 = document.getElementById('model-num').value.trim();
     const colorVal2 = document.getElementById('color-val').value.trim();
-    await fetch(`${GAS_URL}?action=savePhotoInfo&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}&modelNum=${encodeURIComponent(modelNum2)}&colorVal=${encodeURIComponent(colorVal2)}`, {mode:'no-cors'});
+    await fetch(`${GAS_URL}?action=savePhotoInfo&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}&modelNum=${encodeURIComponent(modelNum2)}&colorVal=${encodeURIComponent(colorVal2)}&originVal=${encodeURIComponent(document.getElementById('origin-val').value.trim())}`, {mode:'no-cors'});
     const msg = imageDataList.length > 0
       ? '✅ 画像と情報を保存しました（ステータス変更なし）。リセットします...'
       : '✅ 情報を保存しました（ステータス変更なし）。リセットします...';
@@ -931,6 +942,7 @@ function resetForm() {
   document.getElementById('cond-note').value = '';
   document.getElementById('model-num').value = '';
   document.getElementById('color-val').value = '';
+  document.getElementById('origin-val').value = '';
   document.getElementById('worker-select').value = '';
   document.querySelectorAll('.rank-btn').forEach(b => b.classList.remove('sel'));
   selectedRank = '';
