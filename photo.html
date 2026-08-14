@@ -443,7 +443,7 @@ async function uploadInstaImages() {
     document.getElementById('insta-img-preview').innerHTML = '';
     document.getElementById('insta-img-count').textContent = '';
   } catch(e) {
-    status.innerHTML = `<span style="color:var(--danger)">エラー：${e.message}</span>`;
+    status.innerHTML = `<span style="color:var(--danger)">${driveErrorMessage(e)}</span>`;
   } finally {
     btn.disabled = instaImageDataList.length === 0;
   }
@@ -726,18 +726,45 @@ async function getAccessToken() {
   });
 }
 
+// Drive関連のエラーを、画面表示用のメッセージに変換する（401＝トークン切れの場合は再認証を促す文言にする）
+function driveErrorMessage(e) {
+  if (e && e.driveStatus === 401) {
+    return 'Google認証の有効期限が切れました。もう一度ボタンを押して、Googleへの再ログインを行ってください。';
+  }
+  return `エラー：${e.message}`;
+}
+
+// Drive APIレスポンスの成否を確認する。失敗時は例外を投げる（fetch自体はHTTPエラーでは例外を投げないため）。
+// 401（トークン切れ）の場合は、次回getAccessToken()呼び出し時に再認証させるためaccessTokenをリセットする。
+async function checkDriveResponse(response, context) {
+  if (!response.ok) {
+    if (response.status === 401) {
+      accessToken = null;
+    }
+    let detail = '';
+    try {
+      const errJson = await response.json();
+      detail = (errJson.error && errJson.error.message) || '';
+    } catch (e) {}
+    const err = new Error(`${context}に失敗しました（HTTP ${response.status}）${detail ? '：' + detail : ''}`);
+    err.driveStatus = response.status;
+    throw err;
+  }
+}
+
 // Google Drive に画像アップロード
 async function uploadToDrive(base64, fileName, folderId, token) {
   // 管理番号フォルダを作成or取得
   const mgmtNum = document.getElementById('mgmt-num').value.trim();
-  
+
   // フォルダ検索
   const searchRes = await fetch(
     `https://www.googleapis.com/drive/v3/files?q=name='${mgmtNum}' and '${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
+  await checkDriveResponse(searchRes, 'フォルダ検索');
   const searchData = await searchRes.json();
-  
+
   let subFolderId;
   if (searchData.files && searchData.files.length > 0) {
     subFolderId = searchData.files[0].id;
@@ -748,6 +775,7 @@ async function uploadToDrive(base64, fileName, folderId, token) {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: mgmtNum, mimeType: 'application/vnd.google-apps.folder', parents: [folderId] })
     });
+    await checkDriveResponse(folderRes, 'フォルダ作成');
     const folderData = await folderRes.json();
     subFolderId = folderData.id;
   }
@@ -763,11 +791,12 @@ async function uploadToDrive(base64, fileName, folderId, token) {
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
   form.append('file', blob);
 
-  await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+  const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form
   });
+  await checkDriveResponse(uploadRes, '画像アップロード');
 }
 
 let selectedRank = '';
@@ -966,7 +995,7 @@ async function addImages() {
     document.getElementById('img-preview').innerHTML = '';
     document.getElementById('img-count').textContent = '';
   } catch(e) {
-    status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
+    status.innerHTML = `<div class="status err">${driveErrorMessage(e)}</div>`;
     btn.disabled = false;
   }
 }
@@ -1031,7 +1060,7 @@ async function submitAll() {
     status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 完了しました！リセットします...</div>';
     setTimeout(() => resetForm(), 2000);
   } catch(e) {
-    status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
+    status.innerHTML = `<div class="status err">${driveErrorMessage(e)}（ステータスは更新されていません）</div>`;
     btn.disabled = false;
   }
 }
@@ -1075,7 +1104,7 @@ async function saveInfoOnly() {
     status.innerHTML = `<div class="status ok" style="font-size:14px;padding:12px 0">${msg}</div>`;
     setTimeout(() => resetForm(), 2000);
   } catch(e) {
-    status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
+    status.innerHTML = `<div class="status err">${driveErrorMessage(e)}</div>`;
     btn.disabled = false;
   }
 }
