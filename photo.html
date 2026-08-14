@@ -222,6 +222,30 @@
     </div>
   </div>
 
+  <!-- STEP IG：Instagram投稿設定 -->
+  <div class="step">
+    <div class="step-header"><div class="step-num">IG</div><span class="step-title">Instagram投稿設定</span></div>
+    <div class="field">
+      <label class="acc-item" style="cursor:pointer">
+        <input type="checkbox" id="insta-flag-cb" disabled onchange="onInstaFlagChange()">
+        インスタ投稿対象品
+      </label>
+      <div class="flag-status" id="insta-flag-status"></div>
+    </div>
+    <div class="field" id="insta-image-area" style="display:none">
+      <label>Instagram専用画像</label>
+      <div class="upload-area" onclick="document.getElementById('insta-img-input').click()">
+        タップしてInstagram用画像を追加（複数選択可）
+      </div>
+      <input type="file" id="insta-img-input" accept="image/*" multiple style="display:none" onchange="handleInstaImages(this)"/>
+      <div class="img-count" id="insta-img-count"></div>
+      <div class="img-preview" id="insta-img-preview"></div>
+      <button class="submit-btn" id="insta-upload-btn" onclick="uploadInstaImages()" style="margin-top:10px;background:#c13584" disabled>Instagram用画像をアップロード</button>
+      <div id="insta-existing-status" style="font-size:12px;margin-top:6px;color:var(--text-muted)"></div>
+      <div id="insta-upload-status" style="font-size:12px;margin-top:6px"></div>
+    </div>
+  </div>
+
   <!-- STEP 5：作業者 -->
   <div class="step">
     <div class="step-header"><div class="step-num">5</div><span class="step-title">作業者</span></div>
@@ -254,6 +278,8 @@
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhyXS1KzmO9syc61ZvjSOB6d3w2mxQmqfg9OTv62TBlIUx_/exec';
 const DRIVE_FOLDER_ID = '1tgNP9KsmIxOMTU_G7XQQGWbm_3WUF-BA';
+// Instagram専用画像の保存先（通常の商品画像フォルダとは別）。実際のフォルダIDに置き換えてください。
+const INSTAGRAM_DRIVE_FOLDER_ID = 'PUT_INSTAGRAM_DRIVE_FOLDER_ID_HERE';
 const CLIENT_ID = '24568286649-p64c441e8mrgutb8p81e7it3jg2u8v7e.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 let accessToken = null;
@@ -301,6 +327,125 @@ async function setFlag(flag) {
     setTimeout(() => { status.innerHTML = ''; }, 3000);
   } catch(e) {
     status.innerHTML = `<span style="color:var(--danger)">エラー：${e.message}</span>`;
+  }
+}
+
+// --- Instagram投稿設定 ---
+let instaImageDataList = [];
+
+// 検索結果を反映してInstagram投稿設定欄を有効化
+function enableInstaControls(flag, folderUrl) {
+  const cb = document.getElementById('insta-flag-cb');
+  cb.disabled = false;
+  cb.checked = (flag === 'TRUE' || flag === true);
+  document.getElementById('insta-image-area').style.display = cb.checked ? 'block' : 'none';
+  const existingStatus = document.getElementById('insta-existing-status');
+  existingStatus.innerHTML = folderUrl
+    ? `既存のInstagram用画像あり：<a href="${folderUrl}" target="_blank">Driveで開く</a>`
+    : '';
+}
+
+// インスタ投稿対象品チェックボックスの変更を即時保存（setFlagと同じパターン）
+async function onInstaFlagChange() {
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  if (!mgmtNum) { alert('先に管理番号を検索してください'); return; }
+  const cb = document.getElementById('insta-flag-cb');
+  document.getElementById('insta-image-area').style.display = cb.checked ? 'block' : 'none';
+  const status = document.getElementById('insta-flag-status');
+  status.innerHTML = '<span style="color:var(--text-muted)">送信中...</span>';
+  try {
+    await fetch(`${GAS_URL}?action=setInstaFlag&id=${encodeURIComponent(mgmtNum)}&flag=${encodeURIComponent(cb.checked ? 'TRUE' : 'FALSE')}`, { mode: 'no-cors' });
+    status.innerHTML = `<span style="color:var(--success)">✅ ${cb.checked ? 'インスタ投稿対象に設定しました' : '対象外にしました'}</span>`;
+    setTimeout(() => { status.innerHTML = ''; }, 3000);
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--danger)">エラー：${e.message}</span>`;
+  }
+}
+
+// Instagram用画像の選択処理
+function handleInstaImages(input) {
+  const files = Array.from(input.files);
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const id = Date.now() + Math.random();
+      instaImageDataList.push({ id, base64: e.target.result.split(',')[1], type: file.type, name: file.name });
+      renderInstaPreviews();
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = '';
+}
+
+function renderInstaPreviews() {
+  const preview = document.getElementById('insta-img-preview');
+  const count = document.getElementById('insta-img-count');
+  preview.innerHTML = '';
+  instaImageDataList.forEach(img => {
+    const wrap = document.createElement('div');
+    wrap.className = 'img-thumb-wrap';
+    wrap.innerHTML = `
+      <img src="data:${img.type};base64,${img.base64}" class="img-thumb"/>
+      <button class="img-remove" onclick="removeInstaImage('${img.id}')">×</button>`;
+    preview.appendChild(wrap);
+  });
+  const c = instaImageDataList.length;
+  count.textContent = c > 0 ? `${c}枚選択中` : '';
+  document.getElementById('insta-upload-btn').disabled = c === 0;
+}
+
+function removeInstaImage(id) {
+  instaImageDataList = instaImageDataList.filter(img => img.id != id);
+  renderInstaPreviews();
+}
+
+// アップロード先（Instagram用フォルダ内、管理番号サブフォルダ）のURLを取得
+async function getInstaFolderUrl(mgmtNum, token) {
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=name='${mgmtNum}' and '${INSTAGRAM_DRIVE_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const data = await res.json();
+  if (data.files && data.files.length > 0) {
+    return `https://drive.google.com/drive/folders/${data.files[0].id}`;
+  }
+  return null;
+}
+
+// Instagram専用画像をアップロード（通常の商品画像とは別のDriveフォルダへ、既存のuploadToDriveを流用）
+async function uploadInstaImages() {
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  if (!mgmtNum) { alert('先に管理番号を検索してください'); return; }
+  if (instaImageDataList.length < 1) { alert('アップロードする画像を選択してください'); return; }
+
+  const btn = document.getElementById('insta-upload-btn');
+  const status = document.getElementById('insta-upload-status');
+  btn.disabled = true;
+  status.innerHTML = '<span style="color:var(--text-muted)">Google認証中...</span>';
+
+  try {
+    const token = await getAccessToken();
+    for (let i = 0; i < instaImageDataList.length; i++) {
+      const img = instaImageDataList[i];
+      const fileName = `${mgmtNum}_insta_${String(i + 1).padStart(2, '0')}.jpg`;
+      status.innerHTML = `<span style="color:var(--text-muted)">アップロード中... ${i + 1}/${instaImageDataList.length}</span>`;
+      await uploadToDrive(img.base64, fileName, INSTAGRAM_DRIVE_FOLDER_ID, token);
+    }
+
+    const folderUrl = await getInstaFolderUrl(mgmtNum, token);
+    await fetch(`${GAS_URL}?action=uploadInstaImage&id=${encodeURIComponent(mgmtNum)}&folderUrl=${encodeURIComponent(folderUrl || '')}`, { mode: 'no-cors' });
+
+    status.innerHTML = '<span style="color:var(--success)">✅ Instagram用画像をアップロードしました</span>';
+    document.getElementById('insta-existing-status').innerHTML = folderUrl
+      ? `既存のInstagram用画像あり：<a href="${folderUrl}" target="_blank">Driveで開く</a>`
+      : '';
+    instaImageDataList = [];
+    document.getElementById('insta-img-preview').innerHTML = '';
+    document.getElementById('insta-img-count').textContent = '';
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--danger)">エラー：${e.message}</span>`;
+  } finally {
+    btn.disabled = instaImageDataList.length === 0;
   }
 }
 
@@ -418,6 +563,8 @@ async function fetchProductData(id) {
     }
     // フラグボタン有効化
     enableFlagButtons(data.flag || '');
+    // Instagram投稿設定欄を有効化
+    enableInstaControls(data.instaFlag || '', data.instaFolderUrl || null);
 
     status.innerHTML = data.sizeData || data.rank
       ? '<div class="status ok">既存データを反映しました</div>'
@@ -963,6 +1110,16 @@ function resetForm() {
   document.getElementById('flag-status').innerHTML = '';
   document.getElementById('flag-current-wrap').innerHTML = '';
   currentFlag = '';
+  document.getElementById('insta-flag-cb').checked = false;
+  document.getElementById('insta-flag-cb').disabled = true;
+  document.getElementById('insta-image-area').style.display = 'none';
+  document.getElementById('insta-flag-status').innerHTML = '';
+  document.getElementById('insta-existing-status').innerHTML = '';
+  document.getElementById('insta-upload-status').innerHTML = '';
+  document.getElementById('insta-img-preview').innerHTML = '';
+  document.getElementById('insta-img-count').textContent = '';
+  document.getElementById('insta-upload-btn').disabled = true;
+  instaImageDataList = [];
   imageDataList = [];
   productName = '';
   document.getElementById('submit-btn').disabled = false;
