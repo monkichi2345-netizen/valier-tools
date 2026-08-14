@@ -702,10 +702,12 @@ async function deleteExistingImages(folderId, token) {
     `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,mimeType)`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
+  await checkDriveResponse(res, '既存画像の一覧取得');
   const data = await res.json();
   const files = (data.files || []).filter(f => f.mimeType.startsWith('image/'));
   for (const file of files) {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    const delRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    await checkDriveResponse(delRes, '既存画像の削除');
   }
 }
 
