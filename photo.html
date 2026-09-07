@@ -38,10 +38,6 @@
   .product-card.empty{color:var(--text-hint)}
   .voice-row{display:flex;gap:8px;align-items:flex-start}
   .voice-row textarea,.voice-row input{flex:1}
-  .voice-btn{flex-shrink:0;width:38px;height:38px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s;padding:0}
-  .voice-btn:hover{background:#f5f4f1}
-  .voice-btn.recording{background:var(--danger);border-color:var(--danger);animation:blink 1s infinite}
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
   .upload-area{border:1px dashed var(--border);border-radius:var(--radius-sm);padding:22px;text-align:center;cursor:pointer;color:var(--text-muted);font-size:13px;transition:background .15s}
   .upload-area:hover{background:#f5f4f1}
   .img-preview{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
@@ -114,7 +110,6 @@
       <label>管理番号</label>
       <div class="search-row">
         <input type="text" id="mgmt-num" placeholder="例：115162（6桁）" onkeydown="if(event.key==='Enter')fetchProduct()"/>
-        <button class="voice-btn" onclick="startVoice('mgmt-num',this)" title="音声入力">🎤</button>
         <button class="search-btn" id="search-btn" onclick="fetchProduct()">検索</button>
       </div>
       <div id="search-status"></div>
@@ -141,35 +136,30 @@
       <label>採寸データ</label>
       <div class="voice-row">
         <textarea id="size-data" rows="2" placeholder="例：横〇cm 縦〇cm 幅〇cm ハンドル高さ〇cm ショルダー全長〇cm"></textarea>
-        <button class="voice-btn" onclick="startVoice('size-data',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
       <label>状態メモ（気になる箇所を記入）</label>
       <div class="voice-row">
         <textarea id="cond-note" rows="3" placeholder="例：表面にスレあり、内側に薄い変色、金具に小傷"></textarea>
-        <button class="voice-btn" onclick="startVoice('cond-note',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
       <label>モデル・型番（任意）</label>
       <div class="voice-row">
         <input type="text" id="model-num" placeholder="例：447942 / GG Marmont" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text)"/>
-        <button class="voice-btn" onclick="startVoice('model-num',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
       <label>カラー（任意）</label>
       <div class="voice-row">
         <input type="text" id="color-val" placeholder="例：ブラック、ベージュ×ブラウン" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text)"/>
-        <button class="voice-btn" onclick="startVoice('color-val',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
       <label>原産国（任意）</label>
       <div class="voice-row">
         <input type="text" id="origin-val" placeholder="例：Italy、France、Japan" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text)"/>
-        <button class="voice-btn" onclick="startVoice('origin-val',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
@@ -201,7 +191,6 @@
       </div>
       <div class="voice-row" style="margin-top:8px">
         <input type="text" id="accessory-other" placeholder="その他（例：ベルト、鍵など）"/>
-        <button class="voice-btn" onclick="startVoice('accessory-other',this)" title="音声入力">🎤</button>
       </div>
     </div>
   </div>
@@ -282,8 +271,6 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 let accessToken = null;
 let productName = '';
 let imageDataList = [];
-let recognition = null;
-let activeVoiceBtn = null;
 let arrivedListLoaded = false;
 let arrivedListOpen = false;
 let currentFlag = '';
@@ -869,80 +856,6 @@ function renderPreviews() {
 function removeImage(id) {
   imageDataList = imageDataList.filter(img => img.id != id);
   renderPreviews();
-}
-
-// 採寸テキスト変換
-function convertSizeText(text) {
-  const kanjiMap = {
-    '零':0,'〇':0,'一':1,'二':2,'三':3,'四':4,'五':5,
-    '六':6,'七':7,'八':8,'九':9,'十':10,
-    '百':100,'千':1000
-  };
-
-  // 漢数字→算用数字
-  function kanjiToNum(str) {
-    let result = 0;
-    let current = 0;
-    for (let i = 0; i < str.length; i++) {
-      const c = str[i];
-      const v = kanjiMap[c];
-      if (v === undefined) return null;
-      if (v === 10 || v === 100 || v === 1000) {
-        result += (current === 0 ? 1 : current) * v;
-        current = 0;
-      } else {
-        current = v;
-      }
-    }
-    return result + current;
-  }
-
-  // 漢数字の塊を変換
-  text = text.replace(/[零〇一二三四五六七八九十百千]+/g, match => {
-    const n = kanjiToNum(match);
-    return n !== null ? String(n) : match;
-  });
-
-  // 単位変換
-  text = text.replace(/センチメートル/g, 'cm');
-  text = text.replace(/センチ/g, 'cm');
-  text = text.replace(/ミリメートル/g, 'mm');
-  text = text.replace(/ミリ/g, 'mm');
-
-  // カタカナ→漢字
-  text = text.replace(/タテ/g, '縦');
-  text = text.replace(/ヨコ/g, '横');
-
-  // スペース整理
-  text = text.replace(/\s+/g, ' ').trim();
-
-  return text;
-}
-
-// 音声入力
-function startVoice(targetId, btn) {
-  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-    alert('このブラウザは音声入力に対応していません。Chromeをお使いください。');
-    return;
-  }
-  if (recognition && activeVoiceBtn === btn) { recognition.stop(); return; }
-  if (recognition) recognition.stop();
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SR();
-  recognition.lang = 'ja-JP';
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  activeVoiceBtn = btn;
-  btn.classList.add('recording');
-  recognition.onresult = e => {
-    let t = e.results[0][0].transcript;
-    if (targetId === 'size-data') t = convertSizeText(t);
-    const el = document.getElementById(targetId);
-    el.value += (el.value ? ' ' : '') + t;
-  };
-  recognition.onend = () => { btn.classList.remove('recording'); activeVoiceBtn = null; recognition = null; };
-  recognition.onerror = () => { btn.classList.remove('recording'); activeVoiceBtn = null; recognition = null; };
-  recognition.start();
 }
 
 // 既存アルバムに画像を追加

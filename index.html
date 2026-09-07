@@ -65,10 +65,6 @@
   @keyframes pulse{0%,80%,100%{opacity:.2}40%{opacity:1}}
   .voice-row{display:flex;gap:8px;align-items:flex-start}
   .voice-row textarea,.voice-row input{flex:1}
-  .voice-btn{flex-shrink:0;width:38px;height:38px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s;padding:0}
-  .voice-btn:hover{background:#f5f4f1}
-  .voice-btn.recording{background:var(--danger);border-color:var(--danger);animation:blink 1s infinite}
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
   .accessory-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .acc-item{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;transition:all .1s}
   .acc-item:hover{border-color:var(--border-hover);background:#f5f4f1}
@@ -111,7 +107,6 @@
       <label>管理番号</label>
       <div class="search-row">
         <input type="text" id="mgmt-num" placeholder="例：115162（6桁）" onkeydown="if(event.key==='Enter')fetchProduct()"/>
-        <button class="voice-btn" onclick="startVoice('mgmt-num', this)" title="音声入力">🎤</button>
         <button class="search-btn" id="search-btn" onclick="fetchProduct()">検索</button>
       </div>
       <div id="search-status"></div>
@@ -137,6 +132,11 @@
       <button class="rank-btn" onclick="selRank(this,'B-')"><div>B-</div><div class="rank-desc">B下位</div></button>
       <button class="rank-btn" onclick="selRank(this,'BC')"><div>BC</div><div class="rank-desc">ジャンク</div></button>
     </div>
+    <div class="field" style="margin-top:14px">
+      <label class="acc-item" style="display:inline-flex">
+        <input type="checkbox" id="shopify-eligible-checkbox"> 自社サイト（Shopify）にも掲載する
+      </label>
+    </div>
   </div>
 
   <div class="step">
@@ -145,14 +145,12 @@
       <label>状態の特記事項（現品票より）</label>
       <div class="voice-row">
         <textarea id="condition-note" rows="3" placeholder="例：ハンドルにスレあり、内側に薄い変色、クリーニング済み"></textarea>
-        <button class="voice-btn" onclick="startVoice('condition-note', this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
       <label>採寸データ</label>
       <div class="voice-row">
         <textarea id="size-data" rows="2" placeholder="例：W28×H20×D12cm　持ち手:30cm　ショルダー:最長120cm"></textarea>
-        <button class="voice-btn" onclick="startVoice('size-data', this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
@@ -168,7 +166,6 @@
       </div>
       <div class="voice-row" style="margin-top:8px">
         <input type="text" id="accessory-other" placeholder="その他（例：ベルト、鍵など）"/>
-        <button class="voice-btn" onclick="startVoice('accessory-other', this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
@@ -952,54 +949,6 @@ ACCESSORY_PLACEHOLDER
   }
   btn.disabled = false;
 }
-let recognition = null;
-let activeVoiceBtn = null;
-
-function startVoice(targetId, btn) {
-  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-    alert('このブラウザは音声入力に対応していません。Chromeをお使いください。');
-    return;
-  }
-
-  // 録音中なら停止
-  if (recognition && activeVoiceBtn === btn) {
-    recognition.stop();
-    return;
-  }
-
-  // 他の録音中なら停止
-  if (recognition) recognition.stop();
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognition();
-  recognition.lang = 'ja-JP';
-  recognition.continuous = false;
-  recognition.interimResults = false;
-
-  activeVoiceBtn = btn;
-  btn.classList.add('recording');
-
-  recognition.onresult = (e) => {
-    const transcript = e.results[0][0].transcript;
-    const el = document.getElementById(targetId);
-    el.value += (el.value ? '、' : '') + transcript;
-  };
-
-  recognition.onend = () => {
-    btn.classList.remove('recording');
-    activeVoiceBtn = null;
-    recognition = null;
-  };
-
-  recognition.onerror = (e) => {
-    btn.classList.remove('recording');
-    activeVoiceBtn = null;
-    recognition = null;
-  };
-
-  recognition.start();
-}
-
 async function saveAndReset(mgmtNum) {
   const workerCode = document.getElementById('worker-select').value;
   if (!workerCode) { alert('作業者を選択してください'); return; }
@@ -1010,7 +959,8 @@ async function saveAndReset(mgmtNum) {
   saveStatus.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">保存中...</span></div>';
 
   try {
-    await fetch(`${GAS_URL}?action=save&id=${encodeURIComponent(mgmtNum)}&workerCode=${encodeURIComponent(workerCode)}`);
+    const shopifyEligible = document.getElementById('shopify-eligible-checkbox').checked;
+    await fetch(`${GAS_URL}?action=save&id=${encodeURIComponent(mgmtNum)}&workerCode=${encodeURIComponent(workerCode)}&shopifyEligible=${shopifyEligible ? '1' : '0'}`);
     saveStatus.innerHTML = '<div class="status ok">保存しました！リセットします...</div>';
     setTimeout(() => {
       document.getElementById('mgmt-num').value = '';
@@ -1024,6 +974,7 @@ async function saveAndReset(mgmtNum) {
       document.getElementById('img-input').value = '';
       document.getElementById('img-preview').innerHTML = '';
       document.querySelectorAll('.accessory-grid input[type="checkbox"]').forEach(cb => cb.checked = false);
+      document.getElementById('shopify-eligible-checkbox').checked = false;
       document.querySelectorAll('.rank-btn').forEach(b => b.classList.remove('sel'));
       document.getElementById('output-area').innerHTML = '';
       selectedRank = '';
