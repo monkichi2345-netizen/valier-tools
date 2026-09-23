@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VALIER 撮影提出ツール</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500&display=swap');
   *{box-sizing:border-box;margin:0;padding:0}
@@ -281,14 +280,9 @@
 
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhyXS1KzmO9syc61ZvjSOB6d3w2mxQmqfg9OTv62TBlIUx_/exec';
-// Instagram専用画像の保存先（通常の商品画像フォルダとは別）。実際のフォルダIDに置き換えてください。
-const INSTAGRAM_DRIVE_FOLDER_ID = '1Qxk6nnTHkccQ1rq3tz5JF2gXEtZS4Ba1';
-const CLIENT_ID = '24568286649-p64c441e8mrgutb8p81e7it3jg2u8v7e.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-// 通常の商品画像（STEP4）・タイトル修正・音声入力はこのサーバーAPIを使う（Instagram用画像は従来通りDrive）。
+// 商品画像・Instagram用画像・タイトル修正・音声入力は全てこのサーバーAPIを使う。
 const SERVER_API_URL = 'https://auctiontool.ddns.net/api/photo-tool';
 const SERVER_API_TOKEN = '854ec2caad7f6ae4b315ff9c2f320721832bddf2735f8abfa5196041b9086889';
-let accessToken = null;
 let productName = '';
 let imageDataList = [];
 let mediaRecorder = null;
@@ -347,10 +341,47 @@ function enableInstaControls(flag, folderUrl) {
   cb.disabled = false;
   cb.checked = (flag === 'TRUE' || flag === true);
   document.getElementById('insta-image-area').style.display = cb.checked ? 'block' : 'none';
+  document.getElementById('insta-image-area').dataset.legacyFolderUrl = folderUrl || '';
+}
+
+// サーバーに保存済みのInstagram用画像を確認する（無ければ従来のDriveフォルダへのリンクを表示。移行期間中の後方互換）
+async function checkInstaExistingImages(mgmtNum) {
+  const area = document.getElementById('insta-image-area');
   const existingStatus = document.getElementById('insta-existing-status');
-  existingStatus.innerHTML = folderUrl
-    ? `既存のInstagram用画像あり：<a href="${folderUrl}" target="_blank">Driveで開く</a>`
+  try {
+    const res = await fetch(`${SERVER_API_URL}/instagram-images/${encodeURIComponent(mgmtNum)}`, {
+      headers: { Authorization: `Bearer ${SERVER_API_TOKEN}` }
+    });
+    const data = await res.json();
+    if (data.images && data.images.length > 0) {
+      area.dataset.instaImages = JSON.stringify(data.images);
+      existingStatus.innerHTML = `保存済みのInstagram用画像 ${data.images.length}枚　<button onclick="downloadInstaExistingImages()" style="margin-left:4px;padding:3px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer">一括ダウンロード</button>`;
+      return;
+    }
+  } catch(e) {}
+  area.dataset.instaImages = '';
+  const legacyUrl = area.dataset.legacyFolderUrl;
+  existingStatus.innerHTML = legacyUrl
+    ? `既存のInstagram用画像あり（旧Drive保存）：<a href="${legacyUrl}" target="_blank">Driveで開く</a>`
     : '';
+}
+
+// サーバー保存済みのInstagram用画像を一括ダウンロード
+async function downloadInstaExistingImages() {
+  const area = document.getElementById('insta-image-area');
+  const images = JSON.parse(area.dataset.instaImages || '[]');
+  if (images.length === 0) return;
+  for (const img of images) {
+    try {
+      const res = await fetch(img.url);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = img.name; a.click();
+      URL.revokeObjectURL(url);
+      await new Promise(r => setTimeout(r, 400));
+    } catch(e) {}
+  }
 }
 
 // インスタ投稿対象品チェックボックスの変更を即時保存（setFlagと同じパターン）
@@ -407,20 +438,7 @@ function removeInstaImage(id) {
   renderInstaPreviews();
 }
 
-// アップロード先（Instagram用フォルダ内、管理番号サブフォルダ）のURLを取得
-async function getInstaFolderUrl(mgmtNum, token) {
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='${mgmtNum}' and '${INSTAGRAM_DRIVE_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  const data = await res.json();
-  if (data.files && data.files.length > 0) {
-    return `https://drive.google.com/drive/folders/${data.files[0].id}`;
-  }
-  return null;
-}
-
-// Instagram専用画像をアップロード（通常の商品画像とは別のDriveフォルダへ、既存のuploadToDriveを流用）
+// Instagram専用画像をアップロード（商品画像と同じくサーバーへ直接。常に既存に追加）
 async function uploadInstaImages() {
   const mgmtNum = document.getElementById('mgmt-num').value.trim();
   if (!mgmtNum) { alert('先に管理番号を検索してください'); return; }
@@ -429,29 +447,33 @@ async function uploadInstaImages() {
   const btn = document.getElementById('insta-upload-btn');
   const status = document.getElementById('insta-upload-status');
   btn.disabled = true;
-  status.innerHTML = '<span style="color:var(--text-muted)">Google認証中...</span>';
+  status.innerHTML = '<span style="color:var(--text-muted)">アップロード中...</span>';
 
   try {
-    const token = await getAccessToken();
-    for (let i = 0; i < instaImageDataList.length; i++) {
-      const img = instaImageDataList[i];
-      const fileName = `${mgmtNum}_insta_${String(i + 1).padStart(2, '0')}.jpg`;
-      status.innerHTML = `<span style="color:var(--text-muted)">アップロード中... ${i + 1}/${instaImageDataList.length}</span>`;
-      await uploadToDrive(img.base64, fileName, INSTAGRAM_DRIVE_FOLDER_ID, token);
-    }
-
-    const folderUrl = await getInstaFolderUrl(mgmtNum, token);
-    await fetch(`${GAS_URL}?action=uploadInstaImage&id=${encodeURIComponent(mgmtNum)}&folderUrl=${encodeURIComponent(folderUrl || '')}`, { mode: 'no-cors' });
+    const form = new FormData();
+    form.append('management_number', mgmtNum);
+    instaImageDataList.forEach(img => {
+      const binary = atob(img.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: img.type || 'image/jpeg' });
+      form.append('images[]', blob, img.name || 'insta.jpg');
+    });
+    const res = await fetch(`${SERVER_API_URL}/instagram-images`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${SERVER_API_TOKEN}` },
+      body: form
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'アップロードに失敗しました');
 
     status.innerHTML = '<span style="color:var(--success)">✅ Instagram用画像をアップロードしました</span>';
-    document.getElementById('insta-existing-status').innerHTML = folderUrl
-      ? `既存のInstagram用画像あり：<a href="${folderUrl}" target="_blank">Driveで開く</a>`
-      : '';
     instaImageDataList = [];
     document.getElementById('insta-img-preview').innerHTML = '';
     document.getElementById('insta-img-count').textContent = '';
+    await checkInstaExistingImages(mgmtNum);
   } catch(e) {
-    status.innerHTML = `<span style="color:var(--danger)">${driveErrorMessage(e)}</span>`;
+    status.innerHTML = `<span style="color:var(--danger)">エラー：${e.message}</span>`;
   } finally {
     btn.disabled = instaImageDataList.length === 0;
   }
@@ -587,6 +609,8 @@ async function fetchProductData(id) {
     await checkExistingImages(id6);
     // 検品時に修正済みのタイトルがあれば、そちらを優先表示
     await checkTitleOverride(id6);
+    // Instagram用画像の保存済みチェック
+    await checkInstaExistingImages(id6);
     // 販路表示
     await loadPlatform(id4, data.pf || '');
   } catch(e) {
@@ -877,96 +901,6 @@ function convertSizeText(text) {
   return text;
 }
 
-// Google認証
-async function getAccessToken() {
-  return new Promise((resolve, reject) => {
-    if (accessToken) { resolve(accessToken); return; }
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      callback: (response) => {
-        if (response.error) { reject(response.error); return; }
-        accessToken = response.access_token;
-        resolve(accessToken);
-      }
-    });
-    client.requestAccessToken();
-  });
-}
-
-// Drive関連のエラーを、画面表示用のメッセージに変換する（401＝トークン切れの場合は再認証を促す文言にする）
-function driveErrorMessage(e) {
-  if (e && e.driveStatus === 401) {
-    return 'Google認証の有効期限が切れました。もう一度ボタンを押して、Googleへの再ログインを行ってください。';
-  }
-  return `エラー：${e.message}`;
-}
-
-// Drive APIレスポンスの成否を確認する。失敗時は例外を投げる（fetch自体はHTTPエラーでは例外を投げないため）。
-// 401（トークン切れ）の場合は、次回getAccessToken()呼び出し時に再認証させるためaccessTokenをリセットする。
-async function checkDriveResponse(response, context) {
-  if (!response.ok) {
-    if (response.status === 401) {
-      accessToken = null;
-    }
-    let detail = '';
-    try {
-      const errJson = await response.json();
-      detail = (errJson.error && errJson.error.message) || '';
-    } catch (e) {}
-    const err = new Error(`${context}に失敗しました（HTTP ${response.status}）${detail ? '：' + detail : ''}`);
-    err.driveStatus = response.status;
-    throw err;
-  }
-}
-
-// Google Drive に画像アップロード
-async function uploadToDrive(base64, fileName, folderId, token) {
-  // 管理番号フォルダを作成or取得
-  const mgmtNum = document.getElementById('mgmt-num').value.trim();
-
-  // フォルダ検索
-  const searchRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=name='${mgmtNum}' and '${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  await checkDriveResponse(searchRes, 'フォルダ検索');
-  const searchData = await searchRes.json();
-
-  let subFolderId;
-  if (searchData.files && searchData.files.length > 0) {
-    subFolderId = searchData.files[0].id;
-  } else {
-    // フォルダ作成
-    const folderRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: mgmtNum, mimeType: 'application/vnd.google-apps.folder', parents: [folderId] })
-    });
-    await checkDriveResponse(folderRes, 'フォルダ作成');
-    const folderData = await folderRes.json();
-    subFolderId = folderData.id;
-  }
-
-  // 画像アップロード
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const blob = new Blob([bytes], { type: 'image/jpeg' });
-
-  const metadata = { name: fileName, parents: [subFolderId] };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', blob);
-
-  const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: form
-  });
-  await checkDriveResponse(uploadRes, '画像アップロード');
-}
-
 let selectedRank = '';
 
 function selRank(btn, rank) {
@@ -1067,7 +1001,7 @@ async function addImages() {
     document.getElementById('img-preview').innerHTML = '';
     document.getElementById('img-count').textContent = '';
   } catch(e) {
-    status.innerHTML = `<div class="status err">${driveErrorMessage(e)}</div>`;
+    status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
     btn.disabled = false;
   }
 }
@@ -1117,7 +1051,7 @@ async function submitAll() {
     status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 完了しました！リセットします...</div>';
     setTimeout(() => resetForm(), 2000);
   } catch(e) {
-    status.innerHTML = `<div class="status err">${driveErrorMessage(e)}（ステータスは更新されていません）</div>`;
+    status.innerHTML = `<div class="status err">エラー：${e.message}（ステータスは更新されていません）</div>`;
     btn.disabled = false;
   }
 }
@@ -1156,7 +1090,7 @@ async function saveInfoOnly() {
     status.innerHTML = `<div class="status ok" style="font-size:14px;padding:12px 0">${msg}</div>`;
     setTimeout(() => resetForm(), 2000);
   } catch(e) {
-    status.innerHTML = `<div class="status err">${driveErrorMessage(e)}</div>`;
+    status.innerHTML = `<div class="status err">エラー：${e.message}</div>`;
     btn.disabled = false;
   }
 }
@@ -1198,6 +1132,8 @@ function resetForm() {
   document.getElementById('insta-flag-cb').checked = false;
   document.getElementById('insta-flag-cb').disabled = true;
   document.getElementById('insta-image-area').style.display = 'none';
+  document.getElementById('insta-image-area').dataset.instaImages = '';
+  document.getElementById('insta-image-area').dataset.legacyFolderUrl = '';
   document.getElementById('insta-flag-status').innerHTML = '';
   document.getElementById('insta-existing-status').innerHTML = '';
   document.getElementById('insta-upload-status').innerHTML = '';
