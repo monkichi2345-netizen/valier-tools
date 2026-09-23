@@ -38,6 +38,10 @@
   .product-card.empty{color:var(--text-hint)}
   .voice-row{display:flex;gap:8px;align-items:flex-start}
   .voice-row textarea,.voice-row input{flex:1}
+  .voice-btn{flex-shrink:0;width:38px;height:38px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s;padding:0}
+  .voice-btn:hover{background:#f5f4f1}
+  .voice-btn.recording{background:var(--danger);border-color:var(--danger);animation:blink 1s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.5}}
   .upload-area{border:1px dashed var(--border);border-radius:var(--radius-sm);padding:22px;text-align:center;cursor:pointer;color:var(--text-muted);font-size:13px;transition:background .15s}
   .upload-area:hover{background:#f5f4f1}
   .img-preview{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
@@ -110,13 +114,21 @@
       <label>管理番号</label>
       <div class="search-row">
         <input type="text" id="mgmt-num" placeholder="例：115162（6桁）" onkeydown="if(event.key==='Enter')fetchProduct()"/>
+        <button class="voice-btn" onclick="startVoice('mgmt-num',this)" title="音声入力">🎤</button>
         <button class="search-btn" id="search-btn" onclick="fetchProduct()">検索</button>
       </div>
       <div id="search-status"></div>
     </div>
     <div class="field">
-      <label>商品名</label>
-      <div class="product-card empty" id="product-name">管理番号を検索すると表示されます</div>
+      <label>商品名（検品時に間違いがあれば修正してください）</label>
+      <div class="voice-row">
+        <input type="text" id="product-name-input" placeholder="管理番号を検索すると表示されます" disabled/>
+        <button class="voice-btn" onclick="startVoice('product-name-input',this)" title="音声入力">🎤</button>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px">
+        <button id="title-save-btn" onclick="saveTitle()" disabled style="padding:7px 14px;background:#42a5f5;color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">タイトルを保存</button>
+      </div>
+      <div id="title-save-status" style="font-size:12px;margin-top:4px"></div>
     </div>
     <div class="field" id="platform-area" style="display:none;margin-top:8px">
       <label>販路 <span id="platform-current" style="font-weight:normal;color:var(--text-muted);font-size:12px"></span></label>
@@ -124,7 +136,7 @@
       <div id="platform-status" style="font-size:12px;margin-top:4px;color:var(--text-muted)"></div>
     </div>
     <div id="existing-img-area" style="display:none;margin-top:8px">
-      <button onclick="openDriveFolder()" style="padding:9px 14px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text)">📁 Driveの画像フォルダを開く</button>
+      <button onclick="downloadExistingImages()" style="padding:9px 14px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text)">💾 保存済み画像を一括ダウンロード</button>
       <div id="existing-img-status" style="font-size:12px;margin-top:4px;color:var(--text-muted)"></div>
     </div>
   </div>
@@ -136,30 +148,35 @@
       <label>採寸データ</label>
       <div class="voice-row">
         <textarea id="size-data" rows="2" placeholder="例：横〇cm 縦〇cm 幅〇cm ハンドル高さ〇cm ショルダー全長〇cm"></textarea>
+        <button class="voice-btn" onclick="startVoice('size-data',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
       <label>状態メモ（気になる箇所を記入）</label>
       <div class="voice-row">
         <textarea id="cond-note" rows="3" placeholder="例：表面にスレあり、内側に薄い変色、金具に小傷"></textarea>
+        <button class="voice-btn" onclick="startVoice('cond-note',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
       <label>モデル・型番（任意）</label>
       <div class="voice-row">
         <input type="text" id="model-num" placeholder="例：447942 / GG Marmont" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text)"/>
+        <button class="voice-btn" onclick="startVoice('model-num',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
       <label>カラー（任意）</label>
       <div class="voice-row">
         <input type="text" id="color-val" placeholder="例：ブラック、ベージュ×ブラウン" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text)"/>
+        <button class="voice-btn" onclick="startVoice('color-val',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
       <label>原産国（任意）</label>
       <div class="voice-row">
         <input type="text" id="origin-val" placeholder="例：Italy、France、Japan" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text)"/>
+        <button class="voice-btn" onclick="startVoice('origin-val',this)" title="音声入力">🎤</button>
       </div>
     </div>
     <div class="field">
@@ -191,6 +208,7 @@
       </div>
       <div class="voice-row" style="margin-top:8px">
         <input type="text" id="accessory-other" placeholder="その他（例：ベルト、鍵など）"/>
+        <button class="voice-btn" onclick="startVoice('accessory-other',this)" title="音声入力">🎤</button>
       </div>
     </div>
   </div>
@@ -263,14 +281,20 @@
 
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxoKt9aw5wYYNh_2tShPRhyXS1KzmO9syc61ZvjSOB6d3w2mxQmqfg9OTv62TBlIUx_/exec';
-const DRIVE_FOLDER_ID = '1tgNP9KsmIxOMTU_G7XQQGWbm_3WUF-BA';
 // Instagram専用画像の保存先（通常の商品画像フォルダとは別）。実際のフォルダIDに置き換えてください。
 const INSTAGRAM_DRIVE_FOLDER_ID = '1Qxk6nnTHkccQ1rq3tz5JF2gXEtZS4Ba1';
 const CLIENT_ID = '24568286649-p64c441e8mrgutb8p81e7it3jg2u8v7e.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+// 通常の商品画像（STEP4）・タイトル修正・音声入力はこのサーバーAPIを使う（Instagram用画像は従来通りDrive）。
+const SERVER_API_URL = 'https://auctiontool.ddns.net/api/photo-tool';
+const SERVER_API_TOKEN = '854ec2caad7f6ae4b315ff9c2f320721832bddf2735f8abfa5196041b9086889';
 let accessToken = null;
 let productName = '';
 let imageDataList = [];
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingTargetId = null;
+let activeVoiceBtn = null;
 let arrivedListLoaded = false;
 let arrivedListOpen = false;
 let currentFlag = '';
@@ -482,9 +506,10 @@ async function toggleArrivedList() {
 async function selectFromList(id, name) {
   document.getElementById('mgmt-num').value = id;
   productName = name;
-  const card = document.getElementById('product-name');
-  card.textContent = name;
-  card.classList.remove('empty');
+  const nameInput = document.getElementById('product-name-input');
+  nameInput.value = name;
+  nameInput.disabled = false;
+  document.getElementById('title-save-btn').disabled = false;
   // 一覧を閉じる
   arrivedListOpen = false;
   document.getElementById('arrived-list-wrap').style.display = 'none';
@@ -503,14 +528,18 @@ async function fetchProductData(id) {
     const data = await res.json();
     if (!data.name) {
       status.innerHTML = '<div class="status err">管理番号が見つかりませんでした</div>';
-      document.getElementById('product-name').textContent = '管理番号を検索すると表示されます';
-      document.getElementById('product-name').classList.add('empty');
+      const nameInput0 = document.getElementById('product-name-input');
+      nameInput0.value = '';
+      nameInput0.disabled = true;
+      document.getElementById('title-save-btn').disabled = true;
       productName = '';
       return;
     }
     productName = data.name;
-    document.getElementById('product-name').textContent = data.name;
-    document.getElementById('product-name').classList.remove('empty');
+    const nameInput = document.getElementById('product-name-input');
+    nameInput.value = data.name;
+    nameInput.disabled = false;
+    document.getElementById('title-save-btn').disabled = false;
     // 6桁管理番号を生成してセット
     let id6 = id;
     if (data.breakEven) {
@@ -556,6 +585,8 @@ async function fetchProductData(id) {
 
     // 既存画像チェック（6桁で検索）
     await checkExistingImages(id6);
+    // 検品時に修正済みのタイトルがあれば、そちらを優先表示
+    await checkTitleOverride(id6);
     // 販路表示
     await loadPlatform(id4, data.pf || '');
   } catch(e) {
@@ -620,20 +651,23 @@ async function savePlatform(id4, pf, clickedBtn) {
   }
 }
 
-// 既存画像チェック（Driveにフォルダがあればダウンロードボタン表示）
+// 既存画像チェック（サーバーに保存済みの画像があればダウンロードボタン表示。商品画像専用。Instagram用画像は対象外）
 async function checkExistingImages(mgmtNum) {
   if (!mgmtNum) mgmtNum = document.getElementById('mgmt-num').value.trim();
   if (!mgmtNum) return;
   try {
-    const res = await fetch(`${GAS_URL}?action=getFolder&mgmtNum=${encodeURIComponent(mgmtNum)}`);
+    const res = await fetch(`${SERVER_API_URL}/images/${encodeURIComponent(mgmtNum)}`, {
+      headers: { Authorization: `Bearer ${SERVER_API_TOKEN}` }
+    });
     const data = await res.json();
     const area = document.getElementById('existing-img-area');
-    if (data.url) {
+    if (data.images && data.images.length > 0) {
       area.style.display = 'block';
-      area.dataset.folderId = data.url.match(/folders\/([a-zA-Z0-9_-]+)/)?.[1] || '';
-      document.getElementById('existing-img-status').textContent = 'Driveに既存画像があります';
+      area.dataset.images = JSON.stringify(data.images);
+      document.getElementById('existing-img-status').textContent = `保存済み画像 ${data.images.length}枚`;
     } else {
       area.style.display = 'none';
+      area.dataset.images = '';
       document.getElementById('existing-img-status').textContent = '';
     }
   } catch(e) {
@@ -641,58 +675,206 @@ async function checkExistingImages(mgmtNum) {
   }
 }
 
-// Driveフォルダを開く
-function openDriveFolder() {
-  const area = document.getElementById('existing-img-area');
-  const folderId = area.dataset.folderId;
-  if (!folderId) return;
-  window.open(`https://drive.google.com/drive/folders/${folderId}`, '_blank');
+// 検品時に修正済みのタイトルがサーバー側にあれば、そちらを優先して表示する
+async function checkTitleOverride(mgmtNum) {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/product/${encodeURIComponent(mgmtNum)}`, {
+      headers: { Authorization: `Bearer ${SERVER_API_TOKEN}` }
+    });
+    const data = await res.json();
+    if (data.found && data.title_locked && data.title_ja) {
+      document.getElementById('product-name-input').value = data.title_ja;
+      productName = data.title_ja;
+    }
+  } catch(e) {}
 }
 
-// 既存画像一括ダウンロード
-async function downloadExistingImages() {
-  const folderId = document.getElementById('existing-img-area').dataset.folderId;
-  if (!folderId) return;
-  const status = document.getElementById('existing-img-status');
-  status.textContent = '認証中...';
+// タイトルを保存（検品時の修正。以後、管理表との同期で上書きされなくなる）
+async function saveTitle() {
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  if (!productName) { alert('先に管理番号を検索してください'); return; }
+  const newTitle = document.getElementById('product-name-input').value.trim();
+  if (!newTitle) { alert('商品名を入力してください'); return; }
+  const btn = document.getElementById('title-save-btn');
+  const status = document.getElementById('title-save-status');
+  btn.disabled = true;
+  status.innerHTML = '<span style="color:var(--text-muted)">保存中...</span>';
   try {
-    const token = await getAccessToken();
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const form = new FormData();
+    form.append('management_number', mgmtNum);
+    form.append('title_ja', newTitle);
+    const res = await fetch(`${SERVER_API_URL}/product/title`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${SERVER_API_TOKEN}` },
+      body: form
+    });
     const data = await res.json();
-    const files = (data.files || []).filter(f => f.mimeType.startsWith('image/'));
-    if (files.length === 0) { status.textContent = '画像が見つかりませんでした'; return; }
-    status.textContent = `${files.length}枚ダウンロード中...`;
-    for (const file of files) {
-      const imgRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, { headers: { Authorization: `Bearer ${token}` } });
-      const blob = await imgRes.blob();
+    if (data.success) {
+      status.innerHTML = '<span style="color:var(--success)">✅ タイトルを保存しました</span>';
+      productName = newTitle;
+      setTimeout(() => { status.innerHTML = ''; }, 3000);
+    } else {
+      status.innerHTML = `<span style="color:var(--danger)">エラー：${data.error || '保存に失敗しました'}</span>`;
+    }
+  } catch(e) {
+    status.innerHTML = `<span style="color:var(--danger)">エラー：${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// 保存済み画像を一括ダウンロード
+async function downloadExistingImages() {
+  const area = document.getElementById('existing-img-area');
+  const images = JSON.parse(area.dataset.images || '[]');
+  if (images.length === 0) return;
+  const status = document.getElementById('existing-img-status');
+  status.textContent = `${images.length}枚ダウンロード中...`;
+  for (const img of images) {
+    try {
+      const res = await fetch(img.url);
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = file.name; a.click();
+      a.href = url; a.download = img.name; a.click();
       URL.revokeObjectURL(url);
-      await new Promise(r => setTimeout(r, 500));
-    }
-    status.textContent = `✅ ${files.length}枚ダウンロード完了`;
+      await new Promise(r => setTimeout(r, 400));
+    } catch(e) {}
+  }
+  status.textContent = `✅ ${images.length}枚ダウンロード完了`;
+}
+
+// 商品画像をサーバーへアップロード（mode: 'replace'＝既存を消して置き換え／'append'＝既存に追加）
+async function uploadImagesToServer(mgmtNum, mode) {
+  const form = new FormData();
+  form.append('management_number', mgmtNum);
+  form.append('mode', mode);
+  imageDataList.forEach(img => {
+    const binary = atob(img.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: img.type || 'image/jpeg' });
+    form.append('images[]', blob, img.name || 'photo.jpg');
+  });
+  const res = await fetch(`${SERVER_API_URL}/images`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SERVER_API_TOKEN}` },
+    body: form
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'アップロードに失敗しました');
+  }
+  return data;
+}
+
+// 音声入力（録音→サーバー経由でWhisperに文字起こしさせる方式。iPhoneのSafariでも動く）
+function pickAudioMimeType() {
+  const candidates = ['audio/mp4', 'audio/webm', 'audio/ogg'];
+  for (const t of candidates) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return '';
+}
+
+async function startVoice(targetId, btn) {
+  if (mediaRecorder && recordingTargetId === targetId) {
+    mediaRecorder.stop();
+    return;
+  }
+  if (mediaRecorder) { mediaRecorder.stop(); }
+
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    alert('このブラウザは音声入力に対応していません。');
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = pickAudioMimeType();
+    mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    recordedChunks = [];
+    recordingTargetId = targetId;
+    activeVoiceBtn = btn;
+    btn.classList.add('recording');
+
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      btn.classList.remove('recording');
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = '⏳';
+      try {
+        const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        const ext = (mediaRecorder.mimeType || '').includes('mp4') ? 'm4a' : 'webm';
+        const form = new FormData();
+        form.append('audio', blob, `voice.${ext}`);
+        const res = await fetch(`${SERVER_API_URL}/transcribe`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${SERVER_API_TOKEN}` },
+          body: form
+        });
+        const data = await res.json();
+        if (data.text) {
+          let t = data.text;
+          if (targetId === 'size-data') t = convertSizeText(t);
+          const el = document.getElementById(targetId);
+          el.value += (el.value ? ' ' : '') + t;
+        } else if (data.error) {
+          alert('音声認識エラー：' + data.error);
+        }
+      } catch(e) {
+        alert('音声認識中にエラーが発生しました：' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+        mediaRecorder = null;
+        recordingTargetId = null;
+        activeVoiceBtn = null;
+      }
+    };
+    mediaRecorder.start();
   } catch(e) {
-    status.textContent = `エラー：${e.message}`;
+    alert('マイクへのアクセスが許可されませんでした：' + e.message);
   }
 }
 
-// Driveの既存画像を全削除
-async function deleteExistingImages(folderId, token) {
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,mimeType)`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  await checkDriveResponse(res, '既存画像の一覧取得');
-  const data = await res.json();
-  const files = (data.files || []).filter(f => f.mimeType.startsWith('image/'));
-  for (const file of files) {
-    const delRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-    await checkDriveResponse(delRes, '既存画像の削除');
+// 採寸テキスト変換（漢数字→算用数字、単位表記の統一）
+function convertSizeText(text) {
+  const kanjiMap = {
+    '零':0,'〇':0,'一':1,'二':2,'三':3,'四':4,'五':5,
+    '六':6,'七':7,'八':8,'九':9,'十':10,
+    '百':100,'千':1000
+  };
+  function kanjiToNum(str) {
+    let result = 0;
+    let current = 0;
+    for (let i = 0; i < str.length; i++) {
+      const c = str[i];
+      const v = kanjiMap[c];
+      if (v === undefined) return null;
+      if (v === 10 || v === 100 || v === 1000) {
+        result += (current === 0 ? 1 : current) * v;
+        current = 0;
+      } else {
+        current = v;
+      }
+    }
+    return result + current;
   }
+  text = text.replace(/[零〇一二三四五六七八九十百千]+/g, match => {
+    const n = kanjiToNum(match);
+    return n !== null ? String(n) : match;
+  });
+  text = text.replace(/センチメートル/g, 'cm');
+  text = text.replace(/センチ/g, 'cm');
+  text = text.replace(/ミリメートル/g, 'mm');
+  text = text.replace(/ミリ/g, 'mm');
+  text = text.replace(/タテ/g, '縦');
+  text = text.replace(/ヨコ/g, '横');
+  text = text.replace(/\s+/g, ' ').trim();
+  return text;
 }
 
 // Google認証
@@ -870,35 +1052,13 @@ async function addImages() {
 
   status.innerHTML = `
     <div class="progress-wrap">
-      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar"></div></div>
-      <div class="progress-text" id="progress-text">Google認証中...</div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar" style="width:30%"></div></div>
+      <div class="progress-text" id="progress-text">画像をアップロード中...</div>
     </div>`;
 
   try {
-    const token = await getAccessToken();
-
-    // 既存画像の枚数を取得（ファイル名の連番に使う）
-    const existingArea = document.getElementById('existing-img-area');
-    let existingCount = 0;
-    if (existingArea.style.display !== 'none' && existingArea.dataset.folderId) {
-      document.getElementById('progress-text').textContent = '既存画像数を確認中...';
-      const listRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q='${existingArea.dataset.folderId}'+in+parents+and+trashed=false&fields=files(id)`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const listData = await listRes.json();
-      existingCount = (listData.files || []).length;
-    }
-
-    // 画像を追加アップロード（既存枚数の続き番号から）
-    for (let i = 0; i < imageDataList.length; i++) {
-      const img = imageDataList[i];
-      const fileName = `${mgmtNum}_${String(existingCount + i + 1).padStart(2, '0')}.jpg`;
-      document.getElementById('progress-text').textContent = `画像をアップロード中... ${i+1}/${imageDataList.length}`;
-      await uploadToDrive(img.base64, fileName, DRIVE_FOLDER_ID, token);
-      const pct = Math.round((i + 1) / imageDataList.length * 100);
-      document.getElementById('progress-bar').style.width = pct + '%';
-    }
+    await uploadImagesToServer(mgmtNum, 'append');
+    document.getElementById('progress-bar').style.width = '100%';
 
     status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 画像を追加しました！</div>';
     btn.disabled = false;
@@ -930,29 +1090,14 @@ async function submitAll() {
 
   status.innerHTML = `
     <div class="progress-wrap">
-      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar"></div></div>
-      <div class="progress-text" id="progress-text">Google認証中...</div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="progress-bar" style="width:20%"></div></div>
+      <div class="progress-text" id="progress-text">画像をアップロード中...</div>
     </div>`;
 
   try {
-    const token = await getAccessToken();
-
-    // 既存画像を削除
-    const existingArea = document.getElementById('existing-img-area');
-    if (existingArea.style.display !== 'none' && existingArea.dataset.folderId) {
-      document.getElementById('progress-text').textContent = '既存画像を削除中...';
-      await deleteExistingImages(existingArea.dataset.folderId, token);
-    }
-
-    // 新しい画像をアップロード
-    for (let i = 0; i < imageDataList.length; i++) {
-      const img = imageDataList[i];
-      const fileName = `${mgmtNum}_${String(i+1).padStart(2,'0')}.jpg`;
-      document.getElementById('progress-text').textContent = `画像をアップロード中... ${i+1}/${imageDataList.length}`;
-      await uploadToDrive(img.base64, fileName, DRIVE_FOLDER_ID, token);
-      const pct = Math.round((i + 1) / imageDataList.length * 80);
-      document.getElementById('progress-bar').style.width = pct + '%';
-    }
+    // 既存画像を消して新しい画像に置き換え
+    await uploadImagesToServer(mgmtNum, 'replace');
+    document.getElementById('progress-bar').style.width = '80%';
 
     // スプレッドシートに保存
     const checkedAcc = [];
@@ -996,15 +1141,10 @@ async function saveInfoOnly() {
   btn.disabled = true;
   status.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">保存中...</span></div>';
   try {
-    // 画像があればDriveにアップロード
+    // 画像があればサーバーへアップロード（既存に追加）
     if (imageDataList.length > 0) {
-      const token = await getAccessToken();
-      for (let i = 0; i < imageDataList.length; i++) {
-        const img = imageDataList[i];
-        const fileName = `${mgmtNum}_${String(i+1).padStart(2,'0')}.jpg`;
-        status.innerHTML = `<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">画像をアップロード中... ${i+1}/${imageDataList.length}</span></div>`;
-        await uploadToDrive(img.base64, fileName, DRIVE_FOLDER_ID, token);
-      }
+      status.innerHTML = '<div class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">画像をアップロード中...</span></div>';
+      await uploadImagesToServer(mgmtNum, 'append');
     }
     // 情報を保存
         const modelNum2 = document.getElementById('model-num').value.trim();
@@ -1023,8 +1163,11 @@ async function saveInfoOnly() {
 
 function resetForm() {
   document.getElementById('mgmt-num').value = '';
-  document.getElementById('product-name').textContent = '管理番号を検索すると表示されます';
-  document.getElementById('product-name').classList.add('empty');
+  const nameInputReset = document.getElementById('product-name-input');
+  nameInputReset.value = '';
+  nameInputReset.disabled = true;
+  document.getElementById('title-save-btn').disabled = true;
+  document.getElementById('title-save-status').innerHTML = '';
   document.getElementById('search-status').innerHTML = '';
   document.getElementById('size-data').value = '';
   document.getElementById('cond-note').value = '';
@@ -1044,6 +1187,7 @@ function resetForm() {
   document.getElementById('platform-current').textContent = '';
   document.getElementById('platform-status').textContent = '';
   document.getElementById('existing-img-area').style.display = 'none';
+  document.getElementById('existing-img-area').dataset.images = '';
   document.getElementById('existing-img-status').textContent = '';
   document.getElementById('flag-hold-btn').disabled = true;
   document.getElementById('flag-repair-btn').disabled = true;
