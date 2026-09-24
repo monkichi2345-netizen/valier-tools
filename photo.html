@@ -129,7 +129,7 @@
       <div id="platform-status" style="font-size:12px;margin-top:4px;color:var(--text-muted)"></div>
     </div>
     <div id="existing-img-area" style="display:none;margin-top:8px">
-      <button onclick="downloadExistingImages()" style="padding:9px 14px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text)">💾 保存済み画像を一括ダウンロード</button>
+      <button onclick="downloadExistingImages()" style="padding:9px 14px;background:#f5f4f1;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--text)">💾 保存済み画像をまとめて写真に保存</button>
       <div id="existing-img-status" style="font-size:12px;margin-top:4px;color:var(--text-muted)"></div>
     </div>
   </div>
@@ -339,7 +339,7 @@ async function checkInstaExistingImages(mgmtNum) {
     const data = await res.json();
     if (data.images && data.images.length > 0) {
       area.dataset.instaImages = JSON.stringify(data.images);
-      existingStatus.innerHTML = `保存済みのInstagram用画像 ${data.images.length}枚　<button onclick="downloadInstaExistingImages()" style="margin-left:4px;padding:3px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer">一括ダウンロード</button>`;
+      existingStatus.innerHTML = `保存済みのInstagram用画像 ${data.images.length}枚　<button onclick="downloadInstaExistingImages()" style="margin-left:4px;padding:3px 8px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer">写真に保存</button>`;
       return;
     }
   } catch(e) {}
@@ -354,18 +354,10 @@ async function checkInstaExistingImages(mgmtNum) {
 async function downloadInstaExistingImages() {
   const area = document.getElementById('insta-image-area');
   const images = JSON.parse(area.dataset.instaImages || '[]');
-  if (images.length === 0) return;
-  for (const img of images) {
-    try {
-      const res = await fetch(img.url);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = img.name; a.click();
-      URL.revokeObjectURL(url);
-      await new Promise(r => setTimeout(r, 400));
-    } catch(e) {}
-  }
+  const mgmtNum = document.getElementById('mgmt-num').value.trim();
+  await saveImagesToPhotos(images, document.getElementById('insta-existing-status'));
+  // ボタン自体がinsta-existing-status内に生成されているため、保存後に再描画して残す
+  if (mgmtNum) await checkInstaExistingImages(mgmtNum);
 }
 
 // インスタ投稿対象品チェックボックスの変更を即時保存（setFlagと同じパターン）
@@ -732,24 +724,45 @@ async function saveTitle() {
 }
 
 // 保存済み画像を一括ダウンロード
+// 複数画像をOSの共有シート経由で「写真に保存」させる（ステップ8画面と同じ方式）。
+// 1枚ずつダウンロードさせる方式だとiPhoneのSafariは2枚目以降をブロックすることがあるため、
+// navigator.share()にまとめて渡し、対応していない場合のみ通常ダウンロードに戻す。
+async function saveImagesToPhotos(items, statusEl) {
+  if (items.length === 0) return;
+  if (statusEl) statusEl.textContent = `${items.length}枚を準備中...`;
+  try {
+    const files = await Promise.all(items.map(async item => {
+      const res = await fetch(item.url);
+      const blob = await res.blob();
+      return new File([blob], item.name, { type: blob.type || 'application/octet-stream' });
+    }));
+    if (navigator.canShare && navigator.canShare({ files })) {
+      await navigator.share({ files });
+      if (statusEl) statusEl.textContent = `✅ ${files.length}枚を共有しました`;
+    } else {
+      for (const file of files) {
+        const objectUrl = URL.createObjectURL(file);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+      }
+      if (statusEl) statusEl.textContent = `✅ ${files.length}枚ダウンロード完了`;
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError' && statusEl) {
+      statusEl.textContent = `エラー：${e.message}`;
+    }
+  }
+}
+
 async function downloadExistingImages() {
   const area = document.getElementById('existing-img-area');
   const images = JSON.parse(area.dataset.images || '[]');
-  if (images.length === 0) return;
-  const status = document.getElementById('existing-img-status');
-  status.textContent = `${images.length}枚ダウンロード中...`;
-  for (const img of images) {
-    try {
-      const res = await fetch(img.url);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = img.name; a.click();
-      URL.revokeObjectURL(url);
-      await new Promise(r => setTimeout(r, 400));
-    } catch(e) {}
-  }
-  status.textContent = `✅ ${images.length}枚ダウンロード完了`;
+  await saveImagesToPhotos(images, document.getElementById('existing-img-status'));
 }
 
 // 商品画像をサーバーへアップロード（mode: 'replace'＝既存を消して置き換え／'append'＝既存に追加）
