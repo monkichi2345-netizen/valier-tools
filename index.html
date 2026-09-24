@@ -338,31 +338,28 @@ async function downloadAllImages(folderUrl) {
   }
 }
 
-// サーバー保存済み画像（撮影ツールから直接アップロードされたもの）をOSの共有シート経由で写真に保存する。
-// 複数枚を1枚ずつダウンロードさせる方式だとiPhoneのSafariで2枚目以降がブロックされることがあるため。
+// サーバー保存済み画像（撮影ツールから直接アップロードされたもの）をPCのダウンロードフォルダへ
+// 順番通り連番で保存する。
+// この出品ツールはPCでの利用が前提（メルカリ用フォーマットを作る作業のため）。
+// iPhone向けのnavigator.share（写真アプリへの保存）はPCだと「共有」ダイアログが出るだけで
+// 使いづらいので使わず、ダウンロードフォルダへ順番通り連番で落とす方式に統一する。
 async function saveServerImagesToPhotos() {
   const area = document.getElementById('folder-btn-area');
   const images = JSON.parse(area.dataset.images || '[]');
   if (images.length === 0) return;
   try {
-    const files = await Promise.all(images.map(async item => {
+    for (const item of images) {
       const res = await fetch(item.url);
       const blob = await res.blob();
-      return new File([blob], item.name, { type: blob.type || 'application/octet-stream' });
-    }));
-    if (navigator.canShare && navigator.canShare({ files })) {
-      await navigator.share({ files });
-    } else {
-      for (const file of files) {
-        const objectUrl = URL.createObjectURL(file);
-        const a = document.createElement('a');
-        a.href = objectUrl;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(objectUrl);
-      }
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = item.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+      await new Promise(r => setTimeout(r, 300));
     }
   } catch (e) {
     if (e.name !== 'AbortError') alert('保存に失敗しました：' + e.message);
@@ -383,7 +380,7 @@ async function showImageButtons(mgmtNum, legacyFolderUrl) {
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
           <button onclick="saveServerImagesToPhotos()"
              style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#f5f4f1;border:1px solid #e0ddd8;border-radius:6px;font-size:13px;color:#1a1a1a;cursor:pointer;">
-            💾 画像（${data.images.length}枚）を写真に保存
+            💾 画像（${data.images.length}枚）を一括ダウンロード
           </button>
         </div>`;
       return;
