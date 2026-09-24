@@ -479,8 +479,15 @@ async function fetchProduct() {
 
       status.innerHTML = '<div class="status ok">取得しました</div>';
 
+      // サーバー保存の画像は6桁管理番号でしか引けないため、4桁のまま検索された場合はここで変換する
+      // （photo.html側は既にこの変換をしてから画像確認しているが、index.htmlは今まで不要だった）。
+      const id6ForImages = data.breakEven ? generateMgmtNum(num.slice(0, 4), data.breakEven) : num;
+      if (id6ForImages !== num) {
+        document.getElementById('mgmt-num').value = id6ForImages;
+      }
+
       // 画像フォルダ／保存ボタン表示（サーバー保存分を優先し、無ければDriveへフォールバック）
-      await showImageButtons(num, data.folderUrl || null);
+      await showImageButtons(id6ForImages, data.folderUrl || null);
     } else {
       status.innerHTML = '<div class="status err">管理番号が見つかりませんでした</div>';
       document.getElementById('product-name').textContent = '管理番号を検索すると表示されます';
