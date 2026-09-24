@@ -378,16 +378,17 @@ async function onInstaFlagChange() {
 }
 
 // Instagram用画像の選択処理
+// handleImages()と同じ理由で、Promise.allで選択順を保証する。
 function handleInstaImages(input) {
   const files = Array.from(input.files);
-  files.forEach(file => {
+  Promise.all(files.map(file => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = e => {
-      const id = Date.now() + Math.random();
-      instaImageDataList.push({ id, base64: e.target.result.split(',')[1], type: file.type, name: file.name });
-      renderInstaPreviews();
-    };
+    reader.onload = e => resolve({ id: Date.now() + Math.random(), base64: e.target.result.split(',')[1], type: file.type, name: file.name });
+    reader.onerror = reject;
     reader.readAsDataURL(file);
+  }))).then(results => {
+    instaImageDataList.push(...results);
+    renderInstaPreviews();
   });
   input.value = '';
 }
@@ -844,16 +845,18 @@ async function fetchProduct() {
 }
 
 // 画像処理
+// 選んだ画像を、選択した順番のまま確実に反映する。FileReaderは複数同時に走らせると
+// 読み込み完了の早い者勝ちで順番が入れ替わることがあるため、Promise.allで元の並び順を保証する。
 function handleImages(input) {
   const files = Array.from(input.files);
-  files.forEach(file => {
+  Promise.all(files.map(file => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = e => {
-      const id = Date.now() + Math.random();
-      imageDataList.push({ id, base64: e.target.result.split(',')[1], type: file.type, name: file.name });
-      renderPreviews();
-    };
+    reader.onload = e => resolve({ id: Date.now() + Math.random(), base64: e.target.result.split(',')[1], type: file.type, name: file.name });
+    reader.onerror = reject;
     reader.readAsDataURL(file);
+  }))).then(results => {
+    imageDataList.push(...results);
+    renderPreviews();
   });
   input.value = '';
 }
