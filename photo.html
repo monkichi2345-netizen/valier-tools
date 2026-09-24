@@ -789,6 +789,24 @@ async function uploadImagesToServer(mgmtNum, mode) {
   return data;
 }
 
+// 採寸・状態メモ等を管理表へ保存する（endpoint: 'photo-complete'＝撮影済みへ進める／'photo-info'＝ステータス変更なし）。
+// 以前はGASへmode:'no-cors'で撃ちっぱなしにしていたため、GAS側で失敗しても気づけなかった。
+// サーバー経由にすることで、失敗時にここで例外を投げ、呼び出し元のcatchでエラー表示させる。
+async function savePhotoFields(endpoint, fields) {
+  const form = new FormData();
+  Object.entries(fields).forEach(([key, value]) => form.append(key, value));
+  const res = await fetch(`${SERVER_API_URL}/product/${endpoint}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SERVER_API_TOKEN}` },
+    body: form
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || '管理表への保存に失敗しました');
+  }
+  return data;
+}
+
 let selectedRank = '';
 
 function selRank(btn, rank) {
@@ -931,9 +949,13 @@ async function submitAll() {
     const accData = checkedAcc.length > 0 ? checkedAcc.join('、') : 'なし、本体のみ';
 
     document.getElementById('progress-text').textContent = 'データを保存中...';
-        const modelNum = document.getElementById('model-num').value.trim();
+    const modelNum = document.getElementById('model-num').value.trim();
     const colorVal = document.getElementById('color-val').value.trim();
-    await fetch(`${GAS_URL}?action=savePhoto&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}&modelNum=${encodeURIComponent(modelNum)}&colorVal=${encodeURIComponent(colorVal)}&originVal=${encodeURIComponent(document.getElementById('origin-val').value.trim())}`, {mode:'no-cors'});
+    await savePhotoFields('photo-complete', {
+      management_number: mgmtNum, size_data: sizeData, cond_note: condNote, worker_code: workerCode,
+      acc_data: accData, rank: selectedRank, model_num: modelNum, color_val: colorVal,
+      origin_val: document.getElementById('origin-val').value.trim()
+    });
 
     document.getElementById('progress-bar').style.width = '100%';
     status.innerHTML = '<div class="status ok" style="font-size:14px;padding:12px 0">✅ 完了しました！リセットします...</div>';
@@ -969,9 +991,13 @@ async function saveInfoOnly() {
       await uploadImagesToServer(mgmtNum, 'append');
     }
     // 情報を保存
-        const modelNum2 = document.getElementById('model-num').value.trim();
+    const modelNum2 = document.getElementById('model-num').value.trim();
     const colorVal2 = document.getElementById('color-val').value.trim();
-    await fetch(`${GAS_URL}?action=savePhotoInfo&id=${encodeURIComponent(mgmtNum)}&sizeData=${encodeURIComponent(sizeData)}&condNote=${encodeURIComponent(condNote)}&workerCode=${encodeURIComponent(workerCode)}&accData=${encodeURIComponent(accData)}&rank=${encodeURIComponent(selectedRank)}&modelNum=${encodeURIComponent(modelNum2)}&colorVal=${encodeURIComponent(colorVal2)}&originVal=${encodeURIComponent(document.getElementById('origin-val').value.trim())}`, {mode:'no-cors'});
+    await savePhotoFields('photo-info', {
+      management_number: mgmtNum, size_data: sizeData, cond_note: condNote, worker_code: workerCode,
+      acc_data: accData, rank: selectedRank, model_num: modelNum2, color_val: colorVal2,
+      origin_val: document.getElementById('origin-val').value.trim()
+    });
     const msg = imageDataList.length > 0
       ? '✅ 画像と情報を保存しました（ステータス変更なし）。リセットします...'
       : '✅ 情報を保存しました（ステータス変更なし）。リセットします...';
