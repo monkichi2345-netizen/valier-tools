@@ -383,7 +383,25 @@ function handleInstaImages(input) {
   const files = Array.from(input.files);
   Promise.all(files.map(file => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = e => resolve({ id: Date.now() + Math.random(), base64: e.target.result.split(',')[1], type: file.type, name: file.name });
+    reader.onload = e => {
+      // handleImages()と同じ理由で、HEIC等をJPEGに変換してから使う。
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        resolve({
+          id: Date.now() + Math.random(),
+          base64: jpegDataUrl.split(',')[1],
+          type: 'image/jpeg',
+          name: (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg',
+        });
+      };
+      img.onerror = () => resolve({ id: Date.now() + Math.random(), base64: e.target.result.split(',')[1], type: file.type, name: file.name });
+      img.src = e.target.result;
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   }))).then(results => {
@@ -851,7 +869,27 @@ function handleImages(input) {
   const files = Array.from(input.files);
   Promise.all(files.map(file => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = e => resolve({ id: Date.now() + Math.random(), base64: e.target.result.split(',')[1], type: file.type, name: file.name });
+    reader.onload = e => {
+      // iPhoneのHEIC形式などをサーバーが受け付けられるJPEGに変換してから使う
+      // （変換前の生データのまま送ると、サーバー側の画像バリデーションで弾かれることがある）。
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        resolve({
+          id: Date.now() + Math.random(),
+          base64: jpegDataUrl.split(',')[1],
+          type: 'image/jpeg',
+          name: (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg',
+        });
+      };
+      // canvasに描画できない形式だった場合は、元のファイルをそのまま使う（何も送れないよりはまし）。
+      img.onerror = () => resolve({ id: Date.now() + Math.random(), base64: e.target.result.split(',')[1], type: file.type, name: file.name });
+      img.src = e.target.result;
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   }))).then(results => {
