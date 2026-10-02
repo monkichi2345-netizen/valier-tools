@@ -202,7 +202,7 @@
 
   <!-- STEP 4：画像 -->
   <div class="step">
-    <div class="step-header"><div class="step-num">4</div><span class="step-title">商品画像（1〜20枚）</span></div>
+    <div class="step-header"><div class="step-num">4</div><span class="step-title">商品画像（1〜24枚）</span></div>
     <div class="field">
       <div class="upload-area" onclick="document.getElementById('img-input').click()">
         タップして画像を追加（複数選択可）
@@ -962,7 +962,7 @@ async function submitAll() {
 
   if (!productName) { alert('先に管理番号を検索してください'); return; }
   if (imageDataList.length < 1) { alert('画像を1枚以上追加してください'); return; }
-  if (imageDataList.length > 20) { alert('画像は20枚以内にしてください'); return; }
+  if (imageDataList.length > 24) { alert('画像は24枚以内にしてください'); return; }
   if (!workerCode) { alert('作業者を選択してください'); return; }
 
   const btn = document.getElementById('submit-btn');
