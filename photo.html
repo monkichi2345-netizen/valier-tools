@@ -388,9 +388,13 @@ function handleInstaImages(input) {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
+        // iPhoneの高画素写真（48MPなど）は、そのままcanvasに描くとiOSの上限を超えて、
+        // 中身が空のJPEGになりサーバーに弾かれる。長辺3200pxまで縮小してから変換する。
+        const MAX_EDGE = 3200;
+        const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
         const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
         resolve({
           id: Date.now() + Math.random(),
@@ -875,9 +879,13 @@ function handleImages(input) {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
+        // iPhoneの高画素写真（48MPなど）は、そのままcanvasに描くとiOSの上限を超えて、
+        // 中身が空のJPEGになりサーバーに弾かれる。長辺3200pxまで縮小してから変換する。
+        const MAX_EDGE = 3200;
+        const scale = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
         const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
         resolve({
           id: Date.now() + Math.random(),
